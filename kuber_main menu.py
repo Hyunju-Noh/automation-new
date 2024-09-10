@@ -19,6 +19,7 @@ logging.basicConfig(
     ]
 )
 
+
 def capture_screenshot(page, filename, save_path):
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     screenshot_name = f"{filename}_{timestamp}.png"
@@ -27,11 +28,13 @@ def capture_screenshot(page, filename, save_path):
     logging.error(f"스크린샷이 저장되었습니다: {os.path.abspath(filepath)}")
     return filepath
 
+
 def go_back_and_capture_screenshot(page, filename, save_path):
     page.go_back()
     page.wait_for_load_state('networkidle')
     logging.error(f"뒤로가기 후 스크린샷 저장됨: {filename}")
     return capture_screenshot(page, filename, save_path)
+
 
 def get_page_content_with_timeout(page, timeout):
     start_time = time.time()
@@ -86,6 +89,7 @@ def check_for_whiteout(page, button_text, save_path):
         screenshot_path = capture_screenshot(page, "timeout_screen", save_path)
         logging.error(f"페이지를 로드하는 동안 타임아웃이 발생했습니다: {screenshot_path}")
 
+
 def extract_and_resolve_all_links(page, display_controls):
     
     resolved_links = []  # 링크와 절대 URL을 저장할 리스트
@@ -103,6 +107,7 @@ def extract_and_resolve_all_links(page, display_controls):
             resolved_links.append((href, absolute_url))
     
     return resolved_links  # 모든 링크의 절대 URL 리스트 반환
+
 
 def run(playwright):
     save_path = os.getenv("WHITEOUT_SCREEN_PATH", "./whiteout_screen")
@@ -177,7 +182,6 @@ def run(playwright):
                 logging.info(f"링크: {href} | 절대 URL: {absolute_url}")
 
             # 절대 URL 리스트에서 하나씩 클릭
-            #재선택하는 내용 넣기
             
             for _, absolute_url in resolved_links:
                 attempt = 0
@@ -267,4 +271,3 @@ def run(playwright):
 with sync_playwright() as playwright:
 
     run(playwright)
-    #테스트
