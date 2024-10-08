@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 
 
+
 # 로깅 설정
 log_save_path = os.getenv("LOG_FILE_PATH", "./logs")  # 로그 파일 경로를 환경 변수로 설정
 if not os.path.exists(log_save_path):
