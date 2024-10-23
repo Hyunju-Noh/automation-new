@@ -8,6 +8,7 @@ __pycache__/
 .venv/
 env/
 venv/
+myenv/
 ENV/
 *.env
 
@@ -64,3 +65,6 @@ dmypy.json
 # 기타 운영체제 파일들
 Thumbs.db
 Desktop.ini
+
+# 패키지
+*lib

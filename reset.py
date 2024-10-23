@@ -4,6 +4,8 @@ import logging
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 import requests
+import random
+import string
 
 # 로깅 설정 파일 위치 따로 설정하기
 log_save_path = os.getenv("LOG_FILE_PATH", "./logs")  # 로그 파일 경로를 환경 변수로 설정
@@ -44,6 +46,28 @@ def handle_dialog(dialog):
     dialog.accept()  # 팝업을 수락
 
 
+def generate_random_password(length=12):
+    # 비밀번호는 숫자, 소문자, 대문자, 특수문자 모두 포함해야 함
+    all_characters = string.ascii_letters + string.digits + "!@#$%^&*()_+"
+
+    # 무작위로 한 개의 소문자, 대문자, 숫자, 특수문자를 먼저 포함시킴 (최소 하나씩 포함 보장)
+    password = [
+        random.choice(string.ascii_lowercase),
+        random.choice(string.ascii_uppercase),
+        random.choice(string.digits),
+        random.choice("!@#$%^&*()_+")
+    ]
+
+    # 나머지 길이만큼 무작위로 추가
+    password += random.choices(all_characters, k=length - 4)
+
+    # 패스워드 순서를 섞음
+    random.shuffle(password)
+
+    # 리스트를 문자열로 변환하여 반환
+    return ''.join(password)
+
+
 @bring_page_to_front
 def test_scenario(page, test_name, inputs, button_name, expected_conditions, test_results, text_name=None, popup_expected=False):
     global popup_detected
@@ -52,16 +76,26 @@ def test_scenario(page, test_name, inputs, button_name, expected_conditions, tes
         if popup_expected:
             page.once("dialog", handle_dialog)  # 팝업 처리 대기
 
+        # 사전을 통해 필드에 대한 입력 방식을 매핑 (패스워드는 특수문자라 type으로 입력이 필요함)
+        input_methods = {
+            "Password": lambda field, value: field.type(value),
+            "default": lambda field, value: field.fill(value),
+        }
+
         # 입력 필드에 값 입력
         for placeholder, value in inputs.items():
             if value is not None:  # None 값은 입력하지 않음
-                page.get_by_placeholder(placeholder, exact=True).fill(value)
+                field = page.get_by_placeholder(placeholder, exact=True)
+                # 'Password' 키워드를 포함하면 type(), 그렇지 않으면 fill() 사용
+                method = input_methods.get("Password" if "Password" in placeholder else "default")
+                method(field, value)
 
         # 버튼 클릭 또는 텍스트 클릭
-        if button_name is not None:
-            page.get_by_role("button", name=button_name).click()  # 버튼 클릭
-        elif text_name is not None:
-            page.get_by_text(text_name).click()  # 텍스트 클릭
+        actions = {
+            'button': lambda: page.get_by_role("button", name=button_name).click(),
+            'text': lambda: page.get_by_text(text_name).click() if text_name is not None else None
+        }
+        actions['button']() if button_name else actions['text']()
 
         # 페이지 로드 상태 대기
         page.wait_for_load_state('networkidle')
@@ -207,17 +241,39 @@ def sign_up_info(page, email_text, password, name, company_name, phone_number):
 
 
 @bring_page_to_front
-def login(page, email, password):
+def login(page, email, password, test_results):
     try:
         logging.info(f"{browser_type.name} - 로그인 페이지로 이동 중...")
         page.goto("https://www.whatap.io/")
         page.get_by_role("link", name="로그인").click()
         page.get_by_placeholder("Company Email").fill(email)
-        page.get_by_placeholder("Password").fill(password)
+        #logging.info(f"Password being inputted: {password}")
+        page.get_by_placeholder("Password").type(password)
+
+        page.wait_for_load_state('networkidle')
+
         page.get_by_role("button", name="로그인").click()
-        logging.info(f" 로그인 성공")
+
+        # 페이지 로드 완료 후 URL 확인
+        after_url = page.url
+        logging.info(f"현재 URL: {after_url}")
+        expected_value = "account/project"
+
+         # 첫번째 조건: URL에 expected_value가 포함되면 성공
+        assert expected_value in after_url, f"로그인 실패"
+        
+        log_result(True, f" 로그인 성공")
+        test_results.append(f" 로그인 성공")
+
+    except AssertionError as e:
+        # Assertion 실패 시 로그 및 결과 기록
+        log_result(False, str(e))
+        test_results.append(str(e))
+    
     except Exception as e:
-        logging.error(f" 로그인 중 오류 발생: {str(e)}")
+        # 기타 예외 처리 로그 및 결과 기록
+        log_result(False, f"예외 발생: {str(e)}")
+        test_results.append(f"예외 발생: {str(e)}")
 
 
 @bring_page_to_front
@@ -283,11 +339,16 @@ def run(playwright):
             #랜덤 메일 생성
             email_text = generate_random_email(page1)
 
+            #랜덤 비밀번호 생성
+            random_password = generate_random_password()
+            logging.info(f"Generated password : {random_password}")
+
+
             #회원가입 정보 입력
             sign_up_info(
                 page=page,
                 email_text=email_text,
-                password="shguswn980512-",
+                password=random_password,
                 name="노현주_자동화테스트",
                 company_name="와탭랩스",
                 phone_number="01058485119"
@@ -296,10 +357,13 @@ def run(playwright):
             # 인증 메일 확인 및 인증 처리
             verification_link = verify_email_and_get_link(page1)
 
+            #logging.info(f"Password for login: {random_password}")
+
             login (
                 page=page,
                 email=email_text,
-                password="shguswn980512-"
+                password=random_password,
+                test_results=test_results
             )
 
             logout(page)
@@ -352,7 +416,6 @@ def run(playwright):
                 
                 inputs = {
                     "Email": email,
-                    "자동입력 방지문자": "a"
                 }
 
                 expected_conditions = {
@@ -374,7 +437,6 @@ def run(playwright):
 
             inputs = {
                 "Email": email_text,  # 랜덤으로 생성된 이메일 텍스트
-                "자동입력 방지문자": "a"  # 자동입력 방지문자
             }
 
             expected_conditions = {
@@ -655,8 +717,8 @@ def run(playwright):
             '''test_name = "3-9. 잘못된 비밀번호 형식 입력한 경우 확인"
 
             inputs = {
-                "새로운 비밀번호": "shguswn980512-",
-                "새로운 비밀번호 재입력": "shguswn980512-"
+                "새로운 비밀번호": random_password,
+                "새로운 비밀번호 재입력": random_password
             }
 
             expected_conditions = {
@@ -674,11 +736,13 @@ def run(playwright):
             )'''
 
             # 3-10. 올바른 비밀번호 형식 입력한 경우 확인
+            random_password2 = generate_random_password()
+
             test_name = "3-10. 올바른 비밀번호 형식 입력한 경우 확인"
 
             inputs = {
-                "새로운 비밀번호": "shguswn980512!",
-                "새로운 비밀번호 재입력": "shguswn980512!"
+                "새로운 비밀번호": random_password2,
+                "새로운 비밀번호 재입력": random_password2
             }
 
             expected_conditions = {
@@ -698,15 +762,19 @@ def run(playwright):
             )
 
             # 4-1 비밀번호 변경 후 로그인 동작 확인
+
+            #먼저 다른 비밀번호 새로 생성
+            random_password3 = generate_random_password()
+
             test_name = "4-1. 비밀번호 변경 후 로그인 동작 확인"
 
             inputs = {
                 "Company Email": email_text,  # 입력할 이메일
-                "Password": "shguswn980512!"  # 입력할 비밀번호
+                "Password": random_password2  # 입력할 비밀번호
             }
 
             expected_conditions = {
-                "url_contains": "account/project/create"  # 로그인 후 이동할 예상 URL
+                "url_contains": "account/project"  # 로그인 후 이동할 예상 URL
             }
 
             # 테스트 실행
@@ -720,7 +788,7 @@ def run(playwright):
                 test_results=test_results
             )
 
-            reset_password_to_original(page, "shguswn980512!", "shguswn980512-")
+            reset_password_to_original(page, random_password2, random_password3)
 
             all_results[browser_type.name] = test_results
 
