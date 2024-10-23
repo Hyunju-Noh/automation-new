@@ -1,10 +1,12 @@
-argcomplete==3.5.1
+argcomplete==2.0.6
 beautifulsoup4==4.12.3
 certifi==2024.8.30
-charset-normalizer==3.4.0
+charset-normalizer==2.1.1
 colorama==0.4.6
-commitizen==3.29.1
-decli==0.6.2
+commitizen==2.42.1
+cz-emoji==0.4.0
+decli==0.5.2
+emoji==1.7.0
 greenlet==3.0.3
 idna==3.10
 iniconfig==2.0.0
@@ -21,7 +23,7 @@ pytest-base-url==2.1.0
 pytest-playwright==0.5.2
 python-slugify==8.0.4
 PyYAML==6.0.2
-questionary==2.0.1
+questionary==1.10.0
 requests==2.32.3
 soupsieve==2.6
 termcolor==2.5.0
