@@ -7,7 +7,7 @@ def setup_logging():
     로그 설정을 초기화하는 함수. 파일 경로를 설정하고 로그 파일을 생성한다.
     """
     # 로깅 설정 파일 위치 설정 (파일 없으면 새로 생성)
-    log_save_path = os.getenv("LOG_FILE_PATH", "./logs")  # 로그 파일 경로를 환경 변수로 설정
+    log_save_path = os.getenv("LOG_FILE_PATH", "./reports/logs/password")  # 로그 파일 경로를 환경 변수로 설정
     if not os.path.exists(log_save_path):
         os.makedirs(log_save_path)
 

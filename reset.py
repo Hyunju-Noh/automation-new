@@ -8,7 +8,7 @@ import random
 import string
 
 # 로깅 설정 파일 위치 따로 설정하기
-log_save_path = os.getenv("LOG_FILE_PATH", "./logs")  # 로그 파일 경로를 환경 변수로 설정
+log_save_path = os.getenv("LOG_FILE_PATH", "./reports/logs/password")  # 로그 파일 경로를 환경 변수로 설정
 if not os.path.exists(log_save_path):
     os.makedirs(log_save_path)
 

@@ -1,4 +1,4 @@
-from logging_utils import log_result
+from utills.logging import log_result
 from utils import bring_page_to_front, handle_dialog
 from globals import popup_detected
 

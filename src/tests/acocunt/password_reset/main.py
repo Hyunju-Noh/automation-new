@@ -1,6 +1,6 @@
 from playwright.sync_api import sync_playwright
 from utils import bring_page_to_front, handle_dialog
-from logging_utils import setup_logging, log_result
+from utils.logging import setup_logging, log_result
 from useraccount_actions import sign_up_info, login, logout, generate_random_password
 from verification import verify_email_and_get_link, get_verification_code_from_email, generate_random_email, find_code_in_first_frame
 from password_reset import password_reset

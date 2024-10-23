@@ -1,7 +1,7 @@
 import random
 import string
 import logging
-from logging_utils import log_result
+from utills.logging import log_result
 from utils import bring_page_to_front
 
 @bring_page_to_front

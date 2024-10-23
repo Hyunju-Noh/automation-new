@@ -1,4 +1,4 @@
-from logging_utils import log_result
+from logging import log_result
 from globals import popup_detected
 import logging
 
