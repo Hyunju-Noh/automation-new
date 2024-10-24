@@ -47,14 +47,14 @@ playwright install
 ```bash
 .
 ├── src/                   # gitignore 미포함 디렉토리
-│   ├── data               # 테스트 데이터 (로그인 정보, 프로젝트 정보 등)
-│   ├── reports            # 테스트 결과 리포트 저장 디렉토리
-│   ├── tests              # 테스트 관련 파일 저장 디렉토리
+│   ├── data               # 테스트에 필요한 데이터 (로그인 정보, 프로젝트 정보 등)
+│   ├── reports            # 테스트 실행 후 생성된 결과 리포트
+│   ├── tests              # 테스트 관련 파일 및 코드
 │   └── utils              # 유틸리티 함수 디렉토리
-├── venv                   # 가상 환경 변수 파일 디렉토리
-├── requirements.txt       # 패키지 종속성 목록
-├── .gitignore             # Pytest 설정 파일
-├── .cz.toml               # 
+├── venv                   # 가상 환경 파일
+├── requirements.txt       # 프로젝트에 필요한 패키지 목록 및 버전
+├── .gitignore             # Git이 추적하지 않을 파일 및 디렉토리 목록
+├── .cz.toml               # Commitizen 설정 파일 (커밋 메시지 규칙 관리)
 └── README.md              # 프로젝트 설명 문서
 
 ```
