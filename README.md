@@ -43,3 +43,18 @@ pip install -r requirements.txt
 ```bash
 playwright install
 ```
+6. 파일 구조
+```bash
+.
+├── src/                   # gitignore 미포함 디렉토리
+│   ├── data               # 테스트 데이터 (로그인 정보, 프로젝트 정보 등)
+│   ├── reports            # 테스트 결과 리포트 저장 디렉토리
+│   ├── tests              # 테스트 관련 파일 저장 디렉토리
+│   └── utils              # 유틸리티 함수 디렉토리
+├── venv                   # 가상 환경 변수 파일 디렉토리
+├── requirements.txt       # 패키지 종속성 목록
+├── .gitignore             # Pytest 설정 파일
+├── .cz.toml               # 
+└── README.md              # 프로젝트 설명 문서
+
+```
