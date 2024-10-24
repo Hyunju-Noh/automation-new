@@ -46,7 +46,7 @@ playwright install
 6. 파일 구조
 ```bash
 .
-├── src/                   # gitignore 미포함 디렉토리
+├── src/                   # Git 추적 포함 디렉토리
 │   ├── data               # 테스트에 필요한 데이터 (로그인 정보, 프로젝트 정보 등)
 │   ├── reports            # 테스트 실행 후 생성된 결과 리포트
 │   ├── tests              # 테스트 관련 파일 및 코드
