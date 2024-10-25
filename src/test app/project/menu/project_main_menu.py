@@ -5,9 +5,11 @@ import time
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from useraccount_actions import login
 
 WHITEOUT_TEXTS = ["죄송합니다", "페이지를 찾을 수 없습니다.", "Bad Gate", "OOOPS"]
+
+browser_type = None
+#popup_detected = False
 
 # 로깅 설정 파일 위치 따로 설정하기
 log_save_path = os.getenv("LOG_FILE_PATH", "./reports/logs/main_menu")  
@@ -16,7 +18,7 @@ if not os.path.exists(log_save_path):
 
 
 # 로깅 설정
-log_filename = f"KUBER_WHITEOUT_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+log_filename = os.path.join(log_save_path, f"KUBER_WHITEOUT_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -27,6 +29,13 @@ logging.basicConfig(
 )
 
 
+def log_result(success, message):
+    if success:
+        logging.info(f"✅ {message}")
+    else:
+        logging.error(f"❌ {message}")
+
+
 def capture_screenshot(page, filename, save_path):
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     screenshot_name = f"{filename}_{timestamp}.png"
@@ -34,6 +43,42 @@ def capture_screenshot(page, filename, save_path):
     page.screenshot(path=filepath)
     logging.error(f"스크린샷이 저장되었습니다: {os.path.abspath(filepath)}")
     return filepath
+
+
+def login(page, email, password, test_results):
+
+    try:
+        logging.info(f"로그인 페이지로 이동 중...")
+        page.goto("https://www.whatap.io/")
+        page.get_by_role("link", name="로그인").click()
+        page.get_by_placeholder("Company Email").fill(email)
+        #logging.info(f"Password being inputted: {password}")
+        page.get_by_placeholder("Password").type(password)
+
+        page.wait_for_load_state('networkidle')
+
+        page.get_by_role("button", name="로그인").click()
+
+        # 페이지 로드 완료 후 URL 확인
+        after_url = page.url
+        logging.info(f"현재 URL: {after_url}")
+        expected_value = "account/project"
+
+         # 첫번째 조건: URL에 expected_value가 포함되면 성공
+        assert expected_value in after_url, f"로그인 실패"
+        
+        log_result(True, f" 로그인 성공")
+        test_results.append(f" 로그인 성공")
+
+    except AssertionError as e:
+        # Assertion 실패 시 로그 및 결과 기록
+        log_result(False, str(e))
+        test_results.append(str(e))
+    
+    except Exception as e:
+        # 기타 예외 처리 로그 및 결과 기록
+        log_result(False, f"예외 발생: {str(e)}")
+        test_results.append(f"예외 발생: {str(e)}")
 
 
 def go_back_and_capture_screenshot(page, filename, save_path):
@@ -48,7 +93,7 @@ def get_page_content_with_timeout(page, timeout):
     while True:
         try:
             # 페이지 콘텐츠를 가져오는 시도
-            logging.info("페이지 컨텐츠를 가져오는 중...")
+            #logging.info("페이지 컨텐츠를 가져오는 중...")
             page_content = page.content()
             return page_content
         except PlaywrightTimeoutError:
@@ -59,6 +104,14 @@ def get_page_content_with_timeout(page, timeout):
                 raise PlaywrightTimeoutError("페이지 콘텐츠를 가져오는 도중 타임아웃이 발생했습니다.")
             # 잠시 대기 후 재시도
             time.sleep(1)
+
+
+''' 모달 팝업을 잡는 함수가 아님. 브라우저 팝업을 잡는 함수임
+def handle_dialog(dialog):
+    global popup_detected
+    logging.info(f"팝업 감지됨: {dialog.message}")
+    popup_detected = True
+    dialog.accept()  # 팝업을 수락'''
         
 
 def check_for_whiteout(page, button_text, save_path):
@@ -67,7 +120,7 @@ def check_for_whiteout(page, button_text, save_path):
 
         #logging.info("페이지 컨텐츠 가져오기 시도 중...")        
         page_content = get_page_content_with_timeout(page, timeout=10000)  # 10초 동안 대기
-        logging.info("페이지 컨텐츠 가져오기 완료")
+        #logging.info("페이지 컨텐츠 가져오기 완료")
 
         found_text = None
         for text in WHITEOUT_TEXTS:
@@ -116,6 +169,59 @@ def extract_and_resolve_all_links(page, display_controls):
     return resolved_links  # 모든 링크의 절대 URL 리스트 반환
 
 
+def close_modal_if_present(page):
+    """
+    페이지에서 다양한 유형의 모달 팝업이 나타나면 닫습니다.
+    """
+    try:
+        # 다양한 팝업 닫기 버튼의 클래스 선택자를 리스트에 추가
+        close_selectors = [
+            ".Styles__Wrapper-bZXaBP.dZPSDU",  # 첫 번째 모달 유형 닫기 버튼
+            ".__floater__open .Styles__Wrapper-bZXaBP.cdnUPE",  # 두 번째 모달 유형 닫기 버튼
+            #".another-modal-close-class",  # 다른 팝업 유형의 닫기 버튼
+            # 추가 팝업 닫기 버튼 클래스
+        ]
+
+        # 순차적으로 닫기 버튼을 찾고, 감지되면 클릭하여 닫음
+        for selector in close_selectors:
+            close_button = page.locator(selector)
+
+            page.wait_for_load_state("domcontentloaded")
+
+            if close_button.count() > 0:
+                logging.info(f"모달 팝업 감지 - 닫기 버튼: {selector}")
+                close_button.click()
+                logging.info("모달 팝업 닫기 완료")
+                return True
+
+    except Exception as e:
+        logging.error(f"모달 팝업을 닫는 중 오류 발생: {str(e)}")
+    return False
+
+
+def perform_action_with_modal_check(page, action_func, *args, **kwargs):
+    """
+    지정된 동작을 수행한 후 모달 팝업이 발생하면 닫고, 발생하지 않으면 그냥 넘어감.
+    
+    Args:
+        page: Playwright의 페이지 객체
+        action_func: 수행할 동작 함수 (예: button.click)
+        *args, **kwargs: 동작 함수에 전달할 인자들
+    """
+    try:
+        # 동작 수행
+        action_func(*args, **kwargs)  # 예: button.click()
+
+        #page.wait_for_load_state('networkidle')
+        page.wait_for_timeout(1000)
+        
+        # 모달 팝업 닫기 시도
+        close_modal_if_present(page)
+        
+    except Exception as e:
+        logging.error(f"동작 수행 중 오류 발생: {str(e)}")
+
+
 def run(playwright):
     save_path = os.getenv("WHITEOUT_SCREEN_PATH", "./reports/screeen_shot/kuber_whiteout")
 
@@ -123,6 +229,7 @@ def run(playwright):
         os.makedirs(save_path)
 
     global browser_type
+    #global popup_detected
     all_results = {}
 
     try:
@@ -140,8 +247,10 @@ def run(playwright):
             context.set_default_timeout(120000)  # 120초로 설정
             page = context.new_page()
 
+            page.on("load", lambda: close_modal_if_present(page))
+
             email_text = "hjnoh@whatap.io"
-            password = "shguswn980512-"
+            password = "shguswn980512!"
 
             login (
                 page=page,
@@ -176,23 +285,25 @@ def run(playwright):
                 parent_elements = menu_wrap.query_selector_all('div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT')
 
                 if parent_elements:
+                    logging.info(f"상위 메뉴 클릭하여 하위 메뉴 오픈 중") 
+
                     for element in parent_elements:
                         try:
-                            logging.info(f"상위 메뉴 클릭하여 하위 메뉴 오픈 중") 
 
                             # 요소 클릭
                             element.click()  # 해당 div 요소를 클릭
 
                             page.wait_for_load_state('networkidle', timeout=20000)  # 페이지가 로드될 때까지 대기
-                            logging.info("하위 메뉴 오픈 후 페이지 로드 완료")
                         except Exception as e:
                             logging.error(f"클릭 중 오류 발생: {str(e)}")
+
+                    logging.info("하위 메뉴 오픈 후 페이지 로드 완료")
                 else:
                     logging.error("상위 메뉴 요소를 찾을 수 없습니다.")
             else:
                 logging.error("MenuWrap 요소를 찾을 수 없습니다.")
 
-            # 메뉴 화면 진입 후 화이트아웃 확인
+            '''# 메뉴 화면 진입 후 화이트아웃 확인
             try:
                 # MenuWrap 요소가 없는 경우 early return으로 처리
                 if not menu_wrap:
@@ -200,37 +311,40 @@ def run(playwright):
                     return
 
                 # menu_wrap 내부에서 하위 메뉴에 해당하는 태그 선택
-                elements = menu_wrap.locator('a[href^="/v2/project/"]')  # 'locator'로 변경
+                elements = menu_wrap.query_selector_all('a[href^="/v2/project/"]')  # 'locator'를 사용하고 싶었지만, ElementHandle 객체에서는 locator 직접 사용 못함 ㅠ
 
-                if elements.count() == 0:
+                if len(elements) == 0:
                     logging.warning("해당하는 링크를 찾을 수 없습니다.")
                     return
 
                 # 하위 메뉴 클릭 및 화이트아웃 검증
-                for i in range(elements.count()):
-                    element = elements.nth(i)
+                for element in elements:
                     href_value = element.get_attribute('href')
-                    logging.info(f"선택할 버튼의 href 속성 값: {href_value}")
 
                     try:
                         # <a> 태그 내부의 버튼 클릭
-                        button = element.locator('div')  # 'locator'로 내부 요소 접근
-                        logging.info(f"선택한 버튼: {button}")
+                        button = element.query_selector('div')  # 'query_selector'로 내부 요소 접근
+                        logging.info(f"선택한 버튼: {href_value}")
 
-                        button.click()  # 해당 버튼 클릭
+                        #button.click()  # 해당 버튼 클릭
+                        perform_action_with_modal_check(page, button.click)
 
-                        logging.info(f"{href_value} 메뉴로 이동 중...")
+                        logging.info(f"{href_value} 메뉴로 이동")
 
                         # 페이지 로드 대기
                         page.wait_for_load_state('networkidle', timeout=20000)
 
+                        #page.once("dialog", handle_dialog)  # 팝업 처리 대기
+
                         # 화이트 아웃 감지
                         logging.info("화이트 아웃 발생 확인 중")
+                        page.wait_for_load_state('networkidle')
                         whiteout_detected = check_for_whiteout(page, f"{href_value} 버튼 클릭", save_path)
 
                         # 화이트 아웃 감지 여부 검증
                         assert not whiteout_detected, f"화이트 아웃이 감지되었습니다: {href_value}"
-                        logging.info(f"{href_value} 검증 완료: 화이트 아웃 없음 (성공)")
+                        log_result(True, f"왼쪽 사이드 메뉴 - {href_value} 검증 완료: 화이트 아웃 없음 (성공)")
+                        test_results.append(f"왼쪽 사이드 메뉴 - {href_value} 검증 완료: 화이트 아웃 없음 (성공)")
 
                     except AssertionError as e:
                         # Assertion 실패 시 로그와 결과 기록, 코드 중단 없이 다음 항목으로 넘어감
@@ -245,7 +359,7 @@ def run(playwright):
                         test_results.append(f"{href_value} 클릭 중 예외 발생: {str(e)}")
 
             except Exception as e:
-                logging.error(f"전체 실행 중 오류 발생: {str(e)}")
+                logging.error(f"사이드 메뉴 - 전체 실행 중 오류 발생: {str(e)}")'''
 
 
 
@@ -295,7 +409,13 @@ def run(playwright):
             #사이트맵 메뉴 접속
             page.locator("button:nth-child(3)").first.click()
 
+            page.wait_for_load_state('networkidle')
+
+            #logging.info(f"사이트맵 정보 불러오는 중")
             sitemap_menu_wrap = page.query_selector('div.SitemapLgStyles__Body-deZNSA.gdxkRY')
+            #logging.info(f"사이트맵 정보 불러오기 완료")
+
+            page.wait_for_load_state('networkidle')
 
             # 사이트맵 - 메뉴 화면 진입 후 화이트아웃 확인
             try:
@@ -303,38 +423,48 @@ def run(playwright):
                     logging.warning("Sitemap 메뉴 요소를 찾을 수 없습니다.")
                     return
 
-                # sitemap_menu_wrap 내부에서 <a> 태그 선택 (id가 'SitemapLg_'로 시작하는 모든 링크 선택)
-                elements = sitemap_menu_wrap.locator('a[id^="SitemapLg"][href^="/v2/project/"]')  # 'id'와 'href' 조건 모두 사용
+                # sitemap_menu_wrap 내부에서 <a> 태그 선택 (class가 'SitemapLgStyles__Link-hUYvxU'로 시작하는 링크 선택)
+                elements = sitemap_menu_wrap.query_selector_all('a.SitemapLgStyles__Link-hUYvxU')  # 클래스 기반 선택
+                #logging.info(f"사이트맵 하위메뉴 정보 다 불러옴")
 
-                if elements.count() == 0:
+                if len(elements) == 0:
                     logging.warning("해당하는 링크를 찾을 수 없습니다.")
                     return
+                #else:
+                #    logging.info(f"{len(elements)}개의 링크를 찾았습니다.")
 
                 # 하위 메뉴 클릭 및 화이트아웃 검증
-                for i in range(elements.count()):
-                    element = elements.nth(i)
+                for element in elements:
                     href_value = element.get_attribute('href')
-                    logging.info(f"선택할 버튼의 href 속성 값: {href_value}")
 
                     try:
-                        # <a> 태그 내부의 버튼 클릭
-                        button = element.locator('div')  # 'locator'로 내부 요소 접근
-                        logging.info(f"선택한 버튼: {button}")
+                        # <a> 태그 요소 자체를 직접 클릭
+                        #button = element.query_selector('div')  
+                        logging.info(f"선택한 버튼: {href_value}")
 
-                        button.click()  # 해당 버튼 클릭
+                        #button.click()  # 해당 버튼 클릭
+                        perform_action_with_modal_check(page, element.click)
 
-                        logging.info(f"{href_value} 메뉴로 이동 중...")
+
+                        logging.info(f"{href_value} 메뉴로 이동")
 
                         # 페이지 로드 대기
                         page.wait_for_load_state('networkidle', timeout=20000)
 
+                        #page.once("dialog", handle_dialog)  # 팝업 처리 대기
+
                         # 화이트 아웃 감지
                         logging.info("화이트 아웃 발생 확인 중")
+                        page.wait_for_load_state('networkidle')
                         whiteout_detected = check_for_whiteout(page, f"{href_value} 버튼 클릭", save_path)
+
+                        page.locator("button:nth-child(3)").first.click()
+                        page.wait_for_load_state('networkidle')
 
                         # 화이트 아웃 감지 여부 검증
                         assert not whiteout_detected, f"화이트 아웃이 감지되었습니다: {href_value}"
-                        logging.info(f"{href_value} 검증 완료: 화이트 아웃 없음 (성공)")
+                        log_result(True, f"사이트맵 - {href_value} 검증 완료: 화이트 아웃 없음 (성공)")
+                        test_results.append(f"사이트맵 - {href_value} 검증 완료: 화이트 아웃 없음 (성공)")
 
                     except AssertionError as e:
                         # Assertion 실패 시 로그와 결과 기록, 코드 중단 없이 다음 항목으로 넘어감
@@ -349,7 +479,7 @@ def run(playwright):
                         test_results.append(f"{href_value} 클릭 중 예외 발생: {str(e)}")
 
             except Exception as e:
-                logging.error(f"전체 실행 중 오류 발생: {str(e)}")
+                logging.error(f"사이트맵 메뉴 - 전체 실행 중 오류 발생: {str(e)}")
 
                 
 
