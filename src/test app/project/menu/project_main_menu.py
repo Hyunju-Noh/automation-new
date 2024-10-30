@@ -12,7 +12,7 @@ browser_type = None
 #popup_detected = False
 
 # 로깅 설정 파일 위치 따로 설정하기
-log_save_path = os.getenv("LOG_FILE_PATH", "./reports/logs/main_menu")  
+log_save_path = os.getenv("LOG_FILE_PATH", "src/reports/logs/main_menu")  
 if not os.path.exists(log_save_path):
     os.makedirs(log_save_path)
 
@@ -223,7 +223,7 @@ def perform_action_with_modal_check(page, action_func, *args, **kwargs):
 
 
 def run(playwright):
-    save_path = os.getenv("WHITEOUT_SCREEN_PATH", "./reports/screeen_shot/kuber_whiteout")
+    save_path = os.getenv("WHITEOUT_SCREEN_PATH", "src/reports/screeen_shot/kuber_whiteout")
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -303,7 +303,7 @@ def run(playwright):
             else:
                 logging.error("MenuWrap 요소를 찾을 수 없습니다.")
 
-            '''# 메뉴 화면 진입 후 화이트아웃 확인
+            # 메뉴 화면 진입 후 화이트아웃 확인
             try:
                 # MenuWrap 요소가 없는 경우 early return으로 처리
                 if not menu_wrap:
@@ -359,7 +359,7 @@ def run(playwright):
                         test_results.append(f"{href_value} 클릭 중 예외 발생: {str(e)}")
 
             except Exception as e:
-                logging.error(f"사이드 메뉴 - 전체 실행 중 오류 발생: {str(e)}")'''
+                logging.error(f"사이드 메뉴 - 전체 실행 중 오류 발생: {str(e)}")
 
 
 
