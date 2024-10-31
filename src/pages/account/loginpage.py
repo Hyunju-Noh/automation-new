@@ -43,7 +43,7 @@ class LoginPage:
         self.page.wait_for_load_state('networkidle')
         self.click_login_btn()
 
-    def login_faill(self, user):
+    def login_fail(self, user):
         """
         [실패 케이스]
         이메일과 비밀번호를 입력하고 로그인 버튼을 클릭하는 메서드.
@@ -53,7 +53,3 @@ class LoginPage:
         self.fill_password(user["password"])
         self.page.wait_for_load_state('networkidle')
         self.click_login_btn()
-
-
-
-
