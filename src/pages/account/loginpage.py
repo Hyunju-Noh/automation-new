@@ -8,7 +8,7 @@ class LoginPage:
         self.input_password = page.locator("#id_password")
 
 
-    def main_page_open(self):
+    def open_main_page(self):
         """
         와탭 메인 화면으로 이동하는 메서드
         사실 로그인 화면에서 사용되지는 않음
@@ -16,7 +16,7 @@ class LoginPage:
         self.page.goto("https://www.whatap.io/")
         self.page.wait_for_load_state('networkidle')
 
-    def login_page_open(self):
+    def open_login_page(self):
         """
         와탭 로그인 화면으로 이동하는 메서드
         """
