@@ -2,11 +2,12 @@ from datetime import datetime
 import logging
 import os
 import time
+import csv
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-WHITEOUT_TEXTS = ["죄송합니다", "페이지를 찾을 수 없습니다.", "Bad Gate", "OOOPS"]
+WHITEOUT_TEXTS = load_whiteout_texts()
 
 browser_type = None
 #popup_detected = False
@@ -112,6 +113,21 @@ def handle_dialog(dialog):
     logging.info(f"팝업 감지됨: {dialog.message}")
     popup_detected = True
     dialog.accept()  # 팝업을 수락'''
+
+
+def load_whiteout_texts(file_path):
+    """CSV 파일에서 화이트아웃 텍스트 목록을 로드합니다."""
+    file_path = os.getenv("WHITEOUT_TEXTS_PATH", "data/whiteout_texts.csv")
+
+    texts = []
+    try:
+        with open(file_path, mode='r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                texts.append(row['text'])
+    except FileNotFoundError:
+        logging.error(f"{file_path} 파일을 찾을 수 없습니다.")
+    return texts
         
 
 def check_for_whiteout(page, button_text, save_path):
@@ -247,7 +263,8 @@ def run(playwright):
             context.set_default_timeout(120000)  # 120초로 설정
             page = context.new_page()
 
-            page.on("load", lambda: close_modal_if_present(page))
+            # 이거는 테스트케이스 코드에 들어가야함
+            #page.on("load", lambda: close_modal_if_present(page))
 
             email_text = "hjnoh@whatap.io"
             password = "shguswn980512!"
@@ -280,6 +297,7 @@ def run(playwright):
             #display_controls = []
 
             # 하위 메뉴를 UI에 표출하기 위해 상위 메뉴 클릭해서 오픈하기
+            '''
             if menu_wrap:
                 # 상위 메뉴 클래스를 가진 요소 찾기
                 parent_elements = menu_wrap.query_selector_all('div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT')
@@ -302,6 +320,23 @@ def run(playwright):
                     logging.error("상위 메뉴 요소를 찾을 수 없습니다.")
             else:
                 logging.error("MenuWrap 요소를 찾을 수 없습니다.")
+
+            '''
+            parent_elements = menu_wrap.query_selector_all('div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT')
+            logging.info(f"상위 메뉴 클릭하여 하위 메뉴 오픈 중") 
+
+            for element in parent_elements:
+                try:
+
+                    # 요소 클릭
+                    element.click()  # 해당 div 요소를 클릭
+
+                    page.wait_for_load_state('networkidle', timeout=20000)  # 페이지가 로드될 때까지 대기
+                except Exception as e:
+                    logging.error(f"클릭 중 오류 발생: {str(e)}")
+            
+            logging.info("하위 메뉴 오픈 후 페이지 로드 완료")
+
 
             # 메뉴 화면 진입 후 화이트아웃 확인
             try:

@@ -3,6 +3,7 @@ import pytest
 from src.utils import *
 from src.pages.account.loginpage import LoginPage
 from src.pages.projects.projectpage import ProjectPage
+from src.pages.common_page import Navigation
 from datetime import datetime
 
 @pytest.fixture(scope="class", params=["chromium", "firefox", "webkit"])
