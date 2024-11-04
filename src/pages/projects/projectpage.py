@@ -1,5 +1,7 @@
+# src/pages/ptojects/projectpage.py
 import logging
 from playwright.sync_api import Page
+from src.pages.common_page import Navigation
 
 class ProjectPage:
     def __init__(self, page: Page):
@@ -22,7 +24,7 @@ class ProjectPage:
     def url(self, project_type, project_id):
         """프로젝트 페이지 URL 반환"""
         return f"https://service.whatap.io/v2/project/{project_type}/{project_id}"
-        
+
 
     def open(self, project_type, project_id):
         """프로젝트 페이지로 이동"""

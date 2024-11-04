@@ -1,17 +1,8 @@
 import logging
 import pytest
-from src.utils import (
-    get_whiteout_save_path,
-    load_whiteout_texts,
-    check_for_whiteout,
-    capture_screenshot,
-    go_back_and_capture_screenshot,
-    get_page_content_with_timeout, 
-    load_project_data, 
-    setup_logging_projectpage,
-)
-from pages.account.loginpage import LoginPage
-from pages.projects.projectpage import ProjectPage
+from src.utils import *
+from src.pages.account.loginpage import LoginPage
+from src.pages.projects.projectpage import ProjectPage
 from datetime import datetime
 
 @pytest.fixture(scope="class", params=["chromium", "firefox", "webkit"])

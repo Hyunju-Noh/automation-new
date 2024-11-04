@@ -1,6 +1,6 @@
 # src/pages/account/loginpage.py
 from playwright.sync_api import Page
-from pages.common.navigation import Navigation
+from src.pages.common_page import Navigation
 
 class LoginPage:
     def __init__(self, page: Page):

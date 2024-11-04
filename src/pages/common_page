@@ -1,4 +1,4 @@
-# src/pages/common/navigation.py
+# src/pages/common_page.py
 from playwright.sync_api import Page
 
 class Navigation:
