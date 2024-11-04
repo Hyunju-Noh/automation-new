@@ -22,5 +22,7 @@ __all__ = [
     "get_page_content_with_timeout",
     "load_project_data",
     "setup_logging",
+    "setup_logging_password_reset",
+    "setup_logging_projectpage",
     "log_result",
 ]
