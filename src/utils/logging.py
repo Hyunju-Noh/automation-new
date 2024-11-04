@@ -3,18 +3,9 @@ import logging
 from datetime import datetime
 
 def setup_logging():
-    """
-    로그 설정을 초기화하는 함수. 파일 경로를 설정하고 로그 파일을 생성한다.
-    """
-    # 로깅 설정 파일 위치 설정 (파일 없으면 새로 생성)
-    log_save_path = os.getenv("LOG_FILE_PATH", "./reports/logs/password")  # 로그 파일 경로를 환경 변수로 설정
-    if not os.path.exists(log_save_path):
-        os.makedirs(log_save_path)
-
-    #로그 파일 이름 설정
-    log_filename = os.path.join(log_save_path, f"PasswordReset_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-    
-    #로깅 설정 초기화
+    """공통 로그 설정 초기화 함수."""
+    os.makedirs(log_save_path, exist_ok=True)
+    log_filename = os.path.join(log_save_path, custom_log_filename)
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -23,6 +14,23 @@ def setup_logging():
             logging.FileHandler(log_filename)
         ]
     )
+
+
+def setup_logging_password_reset():
+    """Password reset 로그 설정."""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_save_path = "src/reports/logs/password_reset"
+    custom_log_filename = f"PasswordReset_{timestamp}.log"
+    setup_logging(log_save_path, custom_log_filename)
+
+
+def setup_logging_projectpage():
+    """Project page 로그 설정."""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_save_path = "src/reports/logs/project_page"
+    custom_log_filename = f"ProjectPage_{timestamp}.log"
+    setup_logging(log_save_path, custom_log_filename)
+
 
 #테스트 로그 결과값 메시징
 def log_result(success, message):

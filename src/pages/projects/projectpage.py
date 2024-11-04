@@ -13,11 +13,20 @@ class ProjectPage:
         self.sitemap_menu_item_selector = 'a.SitemapLgStyles__Link-hUYvxU'
 
 
-    def open_project(self, project_type, project_id):
+    """def open(self, project_type, project_id):
         """프로젝트 URL로 이동하는 메서드"""
         project_url = f"https://service.whatap.io/v2/project/{project_type}/{project_id}"
         self.page.goto(project_url)
-        self.page.wait_for_load_state('networkidle')
+        self.page.wait_for_load_state('networkidle')"""
+    
+    def url(self, project_type, project_id):
+        """프로젝트 페이지 URL 반환"""
+        return f"https://service.whatap.io/v2/project/{project_type}/{project_id}"
+        
+
+    def open(self, project_type, project_id):
+        """프로젝트 페이지로 이동"""
+        self.navigation.navigate(self.url(project_type, project_id))
 
 
     def check_modal_and_wait(self):

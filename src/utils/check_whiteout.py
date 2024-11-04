@@ -19,6 +19,7 @@ def load_whiteout_texts(file_path):
         logging.error(f"{file_path} 파일을 찾을 수 없습니다.")
     return texts
 
+#이런식으로 불러와서 사용하기 (이건 테스트 케이스에 추가될 내용)
 WHITEOUT_TEXTS = load_whiteout_texts()
 
 def get_whiteout_save_path():
@@ -27,12 +28,12 @@ def get_whiteout_save_path():
 
     # 저장 경로가 없으면 생성
     os.makedirs(base_path, exist_ok=True)
-    
-    # 고유한 파일 이름 생성 (현재 시간 기반)
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"whiteout_{timestamp}.png"
 
     # 전체 경로 반환
-    return base_path
+    return os.path.join(base_path, file_name)
 
         
 
@@ -64,12 +65,16 @@ def check_for_whiteout(page, button_text, save_path):
                 logging.warning(f"화이트아웃을 발생시킨 버튼 '{button_text}'을(를) 찾을 수 없습니다.")
             
             go_back_and_capture_screenshot(page, f"back_screen_{found_text}", save_path)
+
+            return True  # 화이트아웃 발생 시 True 반환
             
         else:
             logging.info("정상 페이지로 보입니다.")
+            return False  # 화이트아웃 미발생 시 False 반환
     except PlaywrightTimeoutError:
         screenshot_path = capture_screenshot(page, "timeout_screen", save_path)
         logging.error(f"페이지를 로드하는 동안 타임아웃이 발생했습니다: {screenshot_path}")
+        return True  # 타임아웃 발생 시 True 반환
 
 
 def capture_screenshot(page, filename, save_path):

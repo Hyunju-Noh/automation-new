@@ -68,3 +68,13 @@ Desktop.ini
 
 # 패키지
 *lib
+
+# report 파일
+src/reports/
+*.html
+
+# pytest 캐시
+.pytest_cache/
+
+# JUnit XML 리포트 파일
+test-reports/*.xml

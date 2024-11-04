@@ -1,4 +1,6 @@
 # src/pages/common/navigation.py
+from playwright.sync_api import Page
+
 class Navigation:
     def __init__(self, page):
         self.page = page
