@@ -1,6 +1,6 @@
 import logging
 import pytest
-from utils import (
+from src.utils import (
     get_whiteout_save_path,
     load_whiteout_texts,
     check_for_whiteout,
