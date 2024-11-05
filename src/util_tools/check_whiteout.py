@@ -53,7 +53,7 @@ def check_for_whiteout(page, button_text, save_path):
         
         if found_text:
             logging.error(f"화이트아웃 화면 감지: '{found_text}' 특정 텍스트 발견")
-            screenshot_path = capture_screenshot(page, f"whiteout_screen_{found_text}", save_path)
+            screenshot_path = capture_screenshot(page, f"whiteout_screen_{found_text}.png", save_path)
             
             # 화이트 아웃 발생 원인 버튼의 텍스트를 출력
             button_element = page.query_selector(f"//*[text()='{button_text}']")
@@ -64,7 +64,7 @@ def check_for_whiteout(page, button_text, save_path):
             else:
                 logging.warning(f"화이트아웃을 발생시킨 버튼 '{button_text}'을(를) 찾을 수 없습니다.")
             
-            go_back_and_capture_screenshot(page, f"back_screen_{found_text}", save_path)
+            go_back_and_capture_screenshot(page, f"back_screen_{found_text}.png", save_path)
 
             return True  # 화이트아웃 발생 시 True 반환
             
@@ -72,7 +72,7 @@ def check_for_whiteout(page, button_text, save_path):
             logging.info("정상 페이지로 보입니다.")
             return False  # 화이트아웃 미발생 시 False 반환
     except PlaywrightTimeoutError:
-        screenshot_path = capture_screenshot(page, "timeout_screen", save_path)
+        screenshot_path = capture_screenshot(page, f"timeout_screen.png", save_path)
         logging.error(f"페이지를 로드하는 동안 타임아웃이 발생했습니다: {screenshot_path}")
         return True  # 타임아웃 발생 시 True 반환
 
@@ -81,6 +81,9 @@ def capture_screenshot(page, filename, save_path):
     """
     스크린샷 저장 경로 지정
     """
+    # save_path와 filename을 이용하여 전체 파일 경로 생성
+    full_file_path = os.path.join(save_path, filename)
+    # 스크린샷 저장
     page.screenshot(path=full_file_path)
     logging.error(f"스크린샷이 저장되었습니다: {os.path.abspath(full_file_path)}")
     return full_file_path

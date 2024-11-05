@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime
 
-def setup_logging():
+def setup_logging(log_save_path, custom_log_filename):
     """공통 로그 설정 초기화 함수."""
     os.makedirs(log_save_path, exist_ok=True)
     log_filename = os.path.join(log_save_path, custom_log_filename)

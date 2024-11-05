@@ -1,16 +1,15 @@
 import logging
 import pytest
-from src.utils import *
+from utils import *
 from src.pages.account.loginpage import LoginPage
 from src.pages.projects.projectpage import ProjectPage
-from src.pages.common_page import Navigation
 from datetime import datetime
 
 @pytest.fixture(scope="class", params=["chromium", "firefox", "webkit"])
 def setup_playwright_context(request, playwright):
     """각 브라우저에서 Playwright 설정을 초기화."""
     #프로젝트메뉴 진입에 사용되는 로깅 설정
-    setup_logging_projectpage()
+    utils.setup_logging_projectpage()
 
     # 브라우저 타입에 따라 설정
     browser_type = request.param

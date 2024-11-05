@@ -1,11 +1,12 @@
 # src/pages/ptojects/projectpage.py
 import logging
 from playwright.sync_api import Page
-from src.pages.common_page import Navigation
+import pages 
 
 class ProjectPage:
     def __init__(self, page: Page):
         self.page = page
+        self.navigation = pages.Navigation(page)
         self.menu_wrap_selector = 'div.Menustyles__MenuWrap-hRfo.hmTPnA'
         self.parent_elements_selector = 'div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT'
         self.menu_item_selector = 'a[href^="/v2/project/"]'
@@ -15,11 +16,11 @@ class ProjectPage:
         self.sitemap_menu_item_selector = 'a.SitemapLgStyles__Link-hUYvxU'
 
 
-    """def open(self, project_type, project_id):
-        """프로젝트 URL로 이동하는 메서드"""
-        project_url = f"https://service.whatap.io/v2/project/{project_type}/{project_id}"
-        self.page.goto(project_url)
-        self.page.wait_for_load_state('networkidle')"""
+    # def open(self, project_type, project_id):
+    #     """프로젝트 URL로 이동하는 메서드"""
+    #     project_url = f"https://service.whatap.io/v2/project/{project_type}/{project_id}"
+    #     self.page.goto(project_url)
+    #     self.page.wait_for_load_state('networkidle')
     
     def url(self, project_type, project_id):
         """프로젝트 페이지 URL 반환"""

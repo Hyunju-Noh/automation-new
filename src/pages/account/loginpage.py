@@ -1,11 +1,11 @@
 # src/pages/account/loginpage.py
 from playwright.sync_api import Page
-from src.pages.common_page import Navigation
+import pages 
 
 class LoginPage:
     def __init__(self, page: Page):
         self.page = page
-        self.navigation = Navigation(page)
+        self.navigation = pages.Navigation(page)
         self.login_button = page.locator("#btn_login")
         self.input_email = page.locator("#d_email")
         self.input_password = page.locator("#id_password")
