@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-WHITEOUT_TEXTS = load_whiteout_texts()
+WHITEOUT_TEXTS = ["죄송합니다", "페이지를 찾을 수 없습니다.", "Bad Gate", "OOOPS"]
 
 browser_type = None
 #popup_detected = False
@@ -573,10 +573,10 @@ def run(playwright):
 
         logging.info(f"{browser_type.name}_Test complete")  # 각 브라우저 작업 완료 메시지 출력
 
-        for browser_name, results in all_results.items():
-            logging.info(f"\n=== {browser_name} 테스트 결과 ===")
-            for result in results:
-                logging.info(f"[{browser_name}] {result}")
+        # for browser_name, results in all_results.items():
+        #     logging.info(f"\n=== {browser_name} 테스트 결과 ===")
+        #     for result in results:
+        #         logging.info(f"[{browser_name}] {result}")
         
 with sync_playwright() as playwright:
 
