@@ -1,15 +1,15 @@
 import logging
 import pytest
-from utils import *
-from src.pages.account.loginpage import LoginPage
-from src.pages.projects.projectpage import ProjectPage
+import util_tools
+from pages.account.loginpage import LoginPage
+from pages.projects.projectpage import ProjectPage
 from datetime import datetime
 
 @pytest.fixture(scope="class", params=["chromium", "firefox", "webkit"])
 def setup_playwright_context(request, playwright):
     """각 브라우저에서 Playwright 설정을 초기화."""
     #프로젝트메뉴 진입에 사용되는 로깅 설정
-    utils.setup_logging_projectpage()
+    util_tools.setup_logging_projectpage()
 
     # 브라우저 타입에 따라 설정
     browser_type = request.param
@@ -21,8 +21,8 @@ def setup_playwright_context(request, playwright):
     request.cls.page = context.new_page()
 
     # 테스트 클래스에서 공통 사용되는 설정
-    request.cls.WHITEOUT_TEXTS = load_whiteout_texts()
-    request.cls.save_path = get_whiteout_save_path()
+    request.cls.WHITEOUT_TEXTS = util_tools.load_whiteout_texts()
+    request.cls.save_path = util_tools.get_whiteout_save_path()
     request.cls.browser_type = browser_type
 
     yield
@@ -62,7 +62,7 @@ class Test_ProjectMenus:
         project_page = ProjectPage(self.page)
 
         # 프로젝트 데이터를 로드하고 메뉴 검증 수행
-        projects = load_project_data()
+        projects = util_tools.load_project_data()
 
         for project in projects:
             project_type = project["type"]
@@ -72,7 +72,7 @@ class Test_ProjectMenus:
             project_page.open(project_type, project_id)
 
             # 프로젝트 화면 화이트아웃 확인
-            whiteout_detected = check_for_whiteout(self.page, f"{project_type} {project_id} 메인 화면", self.save_path)
+            whiteout_detected = util_tools.check_for_whiteout(self.page, f"{project_type} {project_id} 메인 화면", self.save_path)
             assert not whiteout_detected, f"화이트 아웃이 감지되었습니다: {project_type} {project_id} 메인 화면" 
 
             # 상위 메뉴 클릭하여 하위 메뉴 오픈
@@ -85,7 +85,7 @@ class Test_ProjectMenus:
                 href_value = project_page.click_menu_item(element)
                 project_page.check_modal_and_wait()
 
-                whiteout_detected = check_for_whiteout(self.page, href_value, self.save_path)
+                whiteout_detected = util_tools.check_for_whiteout(self.page, href_value, self.save_path)
                 assert not whiteout_detected, f"화이트 아웃이 감지되었습니다: {href_value} 버튼"
 
 
@@ -95,7 +95,7 @@ class Test_ProjectMenus:
         project_page = ProjectPage(self.page)
 
         # 프로젝트 데이터를 로드하고 메뉴 검증 수행
-        projects = load_project_data()
+        projects = util_tools.load_project_data()
 
         for project in projects:
             project_type = project["type"]
@@ -105,7 +105,7 @@ class Test_ProjectMenus:
             project_page.open(project_type, project_id)
 
             # 프로젝트 화면 화이트아웃 확인
-            whiteout_detected = check_for_whiteout(self.page, f"{project_type} {project_id} 메인 화면", self.save_path)
+            whiteout_detected = util_tools.check_for_whiteout(self.page, f"{project_type} {project_id} 메인 화면", self.save_path)
             assert not whiteout_detected, f"화이트 아웃이 감지되었습니다: {project_type} {project_id} 메인 화면" 
 
             project_page.click_sitemap_btn()
@@ -116,7 +116,7 @@ class Test_ProjectMenus:
                 href_value = project_page.click_sitemap_menu_item(element)
                 project_page.check_modal_and_wait()
 
-                whiteout_detected = check_for_whiteout(self.page, href_value, self.save_path)
+                whiteout_detected = util_tools.check_for_whiteout(self.page, href_value, self.save_path)
                 assert not whiteout_detected, f"화이트 아웃이 감지되었습니다: {href_value} 버튼"
 
 
