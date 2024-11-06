@@ -1,13 +1,15 @@
 # src/pages/account/loginpage.py
 from playwright.sync_api import Page
-import pages 
+import pages.account as account
+import pages.projects as project
+import pages.common_page as common
 
 class LoginPage:
     def __init__(self, page: Page):
         self.page = page
-        self.navigation = pages.Navigation(page)
+        self.navigation = common.Navigation(page)
         self.login_button = page.locator("#btn_login")
-        self.input_email = page.locator("#d_email")
+        self.input_email = page.locator("#id_email")
         self.input_password = page.locator("#id_password")
 
 
@@ -38,6 +40,7 @@ class LoginPage:
         self.fill_password(user["password"])
         self.page.wait_for_load_state('networkidle')
         self.click_login_btn()
+        self.page.wait_for_load_state('networkidle')
 
     def fail(self, user):
         """
@@ -49,3 +52,4 @@ class LoginPage:
         self.fill_password(user["password"])
         self.page.wait_for_load_state('networkidle')
         self.click_login_btn()
+        self.page.wait_for_load_state('networkidle')

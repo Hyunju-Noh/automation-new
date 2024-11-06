@@ -1,17 +1,17 @@
 # src/pages/ptojects/projectpage.py
 import logging
 from playwright.sync_api import Page
-import pages 
+import pages.common_page as common
 
 class ProjectPage:
     def __init__(self, page: Page):
         self.page = page
-        self.navigation = pages.Navigation(page)
+        self.navigation = common.Navigation(page)
         self.menu_wrap_selector = 'div.Menustyles__MenuWrap-hRfo.hmTPnA'
         self.parent_elements_selector = 'div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT'
         self.menu_item_selector = 'a[href^="/v2/project/"]'
         self.button_selector = 'div'
-        self.sitemap_btn = page.locator("button.Styles__Button-bDBZvm.hwObIj.Ants__Tooltip-kZDSSF").first
+        self.sitemap_btn = page.locator("#ic-sitemap")
         self.sitemap_menu_wrap_selector = 'div.SitemapLgStyles__Body-deZNSA.gdxkRY'
         self.sitemap_menu_item_selector = 'a.SitemapLgStyles__Link-hUYvxU'
 
@@ -40,6 +40,9 @@ class ProjectPage:
         close_selectors = [
             ".Styles__Wrapper-bZXaBP.dZPSDU",  # 첫 번째 모달 유형 닫기 버튼
             ".__floater__open .Styles__Wrapper-bZXaBP.cdnUPE",  # 두 번째 모달 유형 닫기 버튼
+            ".Styles__Wrapper-bZXaBP.bVsFlg svg g#ic-close",  # 세 번째 모달 유형 닫기 버튼
+            ".anticon.anticon-close.ant-modal-close-icon",  # 네 번째 모달 유형 닫기 버튼
+
         ]
         
         for selector in close_selectors:
@@ -118,8 +121,10 @@ class ProjectPage:
 
     def click_sitemap_btn(self):
         """사이트맵 버튼 선택"""
+        logging.info(f"사이트맵 버튼 선택중")
         self.sitemap_btn.click()
         self.page.wait_for_load_state('networkidle')
+        logging.info(f"사이트맵 버튼 선택 완료")
 
 
     def get_sitemap_menu_wrap(self):

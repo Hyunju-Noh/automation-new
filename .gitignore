@@ -70,11 +70,12 @@ Desktop.ini
 *lib
 
 # report 파일
-src/reports
+src/reports/
 *.html
 
 # 테스트 데이터 파일
-src/data
+src/data/
+*.csv
 
 # pytest 캐시
 .pytest_cache/
