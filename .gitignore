@@ -80,4 +80,4 @@ src/reports/
 test-reports/*.xml
 
 # 로그인 세션 상태를 저장한 json파일
-data/storage_state.json
+*.json
