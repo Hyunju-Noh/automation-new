@@ -1,12 +1,12 @@
 # src/pages/ptojects/projectpage.py
 import logging
 from playwright.sync_api import Page
-import pages.common_page as common
+import pages 
 
 class ProjectPage:
     def __init__(self, page: Page):
         self.page = page
-        self.navigation = common.Navigation(page)
+        self.navigation = pages.Navigation(page)
         self.menu_wrap_selector = 'div.Menustyles__MenuWrap-hRfo.hmTPnA'
         self.parent_elements_selector = 'div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT'
         self.menu_item_selector = 'a[href^="/v2/project/"]'

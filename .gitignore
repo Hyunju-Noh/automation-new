@@ -77,7 +77,11 @@ src/reports/
 .pytest_cache/
 
 # JUnit XML 리포트 파일
+<<<<<<< HEAD
 test-reports/*.xml
 
 # 로그인 세션 상태를 저장한 json파일
 *.json
+=======
+test-reports/*.xml
+>>>>>>> parent of ce8b36e (🎉 feat: 테스트케이스 스크립트 완성이다~)
