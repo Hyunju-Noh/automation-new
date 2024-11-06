@@ -73,6 +73,9 @@ Desktop.ini
 src/reports/
 *.html
 
+# 테스트 데이터 파일
+src/data/
+
 # pytest 캐시
 .pytest_cache/
 
