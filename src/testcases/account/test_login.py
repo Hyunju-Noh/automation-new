@@ -53,7 +53,7 @@ class Test_ProjectMenus:
         login_page.open()
         
         # 로그인 동작 수행
-        login_page.success({"username": "hjnoh@whatap.io", "password": "shguswn980512!"})
+        login_page.success({"username": "hjnoh@whatap.io", "password": "shguswn980512-"})
         
         # 로그인 성공 검증
         expected_value = "account/project"

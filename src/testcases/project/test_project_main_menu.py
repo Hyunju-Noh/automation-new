@@ -21,7 +21,7 @@ def login_session_fixture(playwright):
     return login_utils.login_session(playwright)
 
 
-@pytest.fixture(scope="class", params=[  "webkit"])
+@pytest.fixture(scope="class", params=["chromium", "firefox", "webkit"])
 def setup_playwright_context(request, playwright, login_session_fixture):
     """각 브라우저에서 Playwright 설정을 초기화."""
 
@@ -66,7 +66,7 @@ class Test_ProjectMenus:
 
         project_page = ProjectPage(self.page)
 
-        # 프로젝트 데이터를 로드하고 메뉴 검증 수행
+        # 프로젝트 데이터를 로드하고 메뉴 검증 수행 (프로젝트 화면으로 이동을 안함....)
         projects = project_data.load_project_data()
 
         for project in projects:
