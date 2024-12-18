@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-WHITEOUT_TEXTS = load_whiteout_texts()
+WHITEOUT_TEXTS = ["죄송합니다", "페이지를 찾을 수 없습니다.", "Bad Gate", "OOOPS"]
 
 browser_type = None
 #popup_detected = False
@@ -267,7 +267,7 @@ def run(playwright):
             #page.on("load", lambda: close_modal_if_present(page))
 
             email_text = "hjnoh@whatap.io"
-            password = "shguswn980512!"
+            password = "shguswn980512-"
 
             login (
                 page=page,

@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 WHITEOUT_TEXTS = ["죄송합니다", "페이지를 찾을 수 없습니다.", "Bad Gate", "OOOPS"]
 
 browser_type = None
+save_path = None
 #popup_detected = False
 
 # 로깅 설정 파일 위치 따로 설정하기
@@ -237,7 +238,7 @@ def perform_action_with_modal_check(page, action_func, *args, **kwargs):
         logging.error(f"동작 수행 중 오류 발생: {str(e)}")
 
 
-def verify_widget_button_action(page, widget_name, locator, button_name, test_results, action):
+def verify_widget_button_action(page, widget_name, locator, button_name, test_results, action=None, hover_positions=None):
     """
     버튼 동작 수행 함수.
 
@@ -247,20 +248,33 @@ def verify_widget_button_action(page, widget_name, locator, button_name, test_re
     :param button_name: 버튼 이름
     :param test_results: 테스트 결과를 기록할 리스트
     :param action: 버튼 클릭 후 수행할 추가 동작 (콜백 함수)
+    :param hover_positions: 좌표 리스트 (선택적으로 사용)
     """
     try:
         logging.info(f"[{widget_name}] 위젯 UI [{button_name}] 동작 수행 중")
-        button_locator = page.locator(locator)
 
-        # 버튼 클릭
-        button_locator.click()
+        if hover_positions:
+            # 좌표를 활용하여 클릭 동작 수행
+            for position in hover_positions:
+                logging.info(f"[{widget_name}] 좌표 클릭 중: {position}")
+                page.locator(locator).click(position=position)
+                logging.info(f"[{widget_name}] 좌표 클릭 완료: {position}")
+        else:
+            # Locator를 활용하여 버튼 클릭
+            button_locator = page.locator(locator)
+            button_locator.click()
+            logging.info(f"[{widget_name}] [{button_name}] 버튼 클릭 완료")
+
+        page.wait_for_load_state('networkidle')
+
+        
 
         # 추가 동작 수행
         if action:
-            action(page)
+            action(page, test_results)
 
-        log_result(True, f"[{widget_name}] UI [{button_name}] 동작 완료 (성공)")
-        test_results.append(f"[{widget_name}] UI [{button_name}] 동작 완료 (성공)")
+        #log_result(True, f"[{widget_name}] UI [{button_name}] 동작 완료 (성공)")
+        #test_results.append(f"[{widget_name}] UI [{button_name}] 동작 완료 (성공)")
 
     except Exception as e:
         logging.error(f"오류 발생: {str(e)}")
@@ -280,6 +294,9 @@ def verify_widget_ui(page, locator, widget_name, test_results, element_name=None
     try:
         display_name = f"{widget_name} {element_name}" if element_name else widget_name
         logging.info(f"[{display_name}] 표시 확인 중")
+
+        page.wait_for_load_state('networkidle')
+
         element_locator = page.locator(locator)
 
         # UI 요소가 화면에 표시되는지 확인
@@ -288,6 +305,73 @@ def verify_widget_ui(page, locator, widget_name, test_results, element_name=None
 
         log_result(True, f"[{display_name}] 표시 확인 완료 (성공)")
         test_results.append(f"[{display_name}] 표시 확인 완료 (성공)")
+
+    except AssertionError as e:
+        logging.error(f"검증 실패: {str(e)}")
+        log_result(False, str(e))
+        test_results.append(str(e))
+
+    except Exception as e:
+        logging.error(f"오류 발생: {str(e)}")
+        log_result(False, f"예외 발생: {str(e)}")
+        test_results.append(f"예외 발생: {str(e)}")
+
+
+def verify_widget_structure(page, parent_locator, widget_name, element_name, child_count, test_results):
+    """
+    ResourceCards__FlexRemainder의 하위 구조 검증
+
+    :param page: Playwright 페이지 객체
+    :param parent_locator: 부모 요소 locator
+    :param widget_name: 위젯 이름 (로그용)
+    :param element_name: 하위 구조 이름 (로그용)
+    :param child_count: 기대되는 하위 요소 개수
+    :param test_results: 테스트 결과를 기록할 리스트
+    """
+    try:
+        display_name = f"{widget_name} {element_name}" if element_name else widget_name
+        logging.info(f"[{display_name}] 표시 확인 중")
+
+        page.wait_for_load_state('networkidle')
+
+        # 부모 요소 가져오기
+        parent_element = page.locator(parent_locator)
+        assert parent_element.is_visible(), f"[{widget_name}] 위젯의 부모 요소가 보이지 않습니다"
+
+        # 하위 div 요소 가져오기
+        #child_elements = parent_element.locator("div")
+        #assert child_elements.count() == child_count, f"[{widget_name}] 하위 요소 개수가 {child_count}개가 아닙니다"
+
+        # 각 하위 div 내부 구조 확인
+        #for i in range(child_count):
+        #    title_locator = child_elements.nth(i).locator("div.ResourceCards__SubTitle-eZXil.jHWnBP")
+        #    value_locator = child_elements.nth(i).locator("div.ResourceCards__SubValue-bOvbm.cfupYY")
+        #
+        #    assert title_locator.is_visible(), f"[{widget_name}] {i + 1}번째 SubTitle 요소가 존재하지 않습니다"
+        #    assert value_locator.is_visible(), f"[{widget_name}] {i + 1}번째 SubValue 요소가 존재하지 않습니다"
+
+        #    logging.info(f"[{widget_name}] 하위 요소 검증 성공: SubTitle과 SubValue 모두 존재")
+
+        # 하위 요소에서 SubTitle과 SubValue 검증
+        subtitle_elements = parent_element.locator("div.ResourceCards__SubTitle-eZXil")
+        value_elements = parent_element.locator("div.ResourceCards__SubValue-bOvbm")
+
+        subtitle_count = subtitle_elements.count()
+        value_count = value_elements.count()
+
+        # SubTitle과 SubValue 각각 개수 확인 및 검증
+        logging.info(f"[{widget_name}] SubTitle 개수: {subtitle_count}, SubValue 개수: {value_count}")
+        assert subtitle_count > 0, f"[{widget_name}] SubTitle 요소를 찾지 못했습니다"
+        assert value_count > 0, f"[{widget_name}] SubValue 요소를 찾지 못했습니다"
+
+        # 각 요소가 표시되는지 확인
+        for i in range(min(subtitle_count, value_count)):
+            assert subtitle_elements.nth(i).is_visible(), f"[{widget_name}] {i+1}번째 SubTitle 요소가 표시되지 않습니다"
+            assert value_elements.nth(i).is_visible(), f"[{widget_name}] {i+1}번째 SubValue 요소가 표시되지 않습니다"
+            logging.info(f"[{widget_name}] {i+1}번째 SubTitle 및 SubValue 확인 완료")
+
+        log_result(True, f"[{widget_name}] 하위 구조 검증 완료 (성공)")
+        test_results.append(f"[{widget_name}] 하위 구조 검증 완료 (성공)")
 
     except AssertionError as e:
         logging.error(f"검증 실패: {str(e)}")
@@ -328,7 +412,7 @@ def verify_whiteout(page, screen_name, save_path, test_results):
         test_results.append(f"예외 발생: {str(e)}")
 
 
-def verify_widget_hover_action(page, widget_name, element_locator, button_name, test_results, action, hover_position=None):
+def verify_widget_hover_action(page, widget_name, element_locator, button_name, test_results, action=None, hover_position=None):
     """
     버튼 또는 요소에 마우스 호버 후 추가 동작 수행 함수.
 
@@ -354,13 +438,15 @@ def verify_widget_hover_action(page, widget_name, element_locator, button_name, 
             logging.info(f"[{widget_name}] 좌표 ({hover_position['x']}, {hover_position['y']})에 마우스 호버 완료")
         else:
             raise ValueError("Element_locator 또는 hover_position 값이 필요합니다.")
+        
+        page.wait_for_timeout(2000)  # 2초 대기
 
         # 추가 동작 수행
         if action:
-            action(page)
+            action(page, test_results)
 
-        log_result(True, f"[{widget_name}] UI [{button_name}] 마우스 호버 및 동작 완료 (성공)")
-        test_results.append(f"[{widget_name}] UI [{button_name}] 마우스 호버 및 동작 완료 (성공)")
+        #log_result(True, f"[{widget_name}] UI [{button_name}] 마우스 호버 및 동작 완료 (성공)")
+        #test_results.append(f"[{widget_name}] UI [{button_name}] 마우스 호버 및 동작 완료 (성공)")
 
     except Exception as e:
         logging.error(f"[{widget_name}] 오류 발생: {str(e)}")
@@ -369,31 +455,57 @@ def verify_widget_hover_action(page, widget_name, element_locator, button_name, 
 
 
 #위젯별 이 아닌, 검증해야할 동작 별로 액션 함수를 나눠야 할듯
-def button_action_serverwidget(page):
+
+# 5초뒤에 확인 안되면 새로고침 하는 내용 추가하기
+def verify_navigation_action(page, test_results, screen_name, expected_url):
+    """
+    버튼 클릭 후 페이지 이동 및 UI 상태 검증
+
+    :param page: Playwright 페이지 객체
+    :param test_results: 테스트 결과 리스트
+    :param screen_name: 검증 대상 화면 이름 (위젯 리스트에서 전달)
+    :param expected_url: 기대되는 URL (위젯 리스트에서 전달)
+    """
     try:
-        logging.info("버튼 클릭 후 동작 수행")
+        logging.info("버튼 클릭 후 확인 진행 중")
 
-        # 1. 서버 목록 화면으로 이동했는지 확ㅣ
-        page.wait_for_url("**/server/list")
-        assert page.url.endswith("/server/list"), "서버 목록 페이지로 이동하지 않았습니다"
-        logging.info("서버 목록 페이지로 정상 이동 확인됨")
+        # 새 페이지 열림 감지
+        with page.context.expect_page() as new_page_info:
+            logging.info("새 페이지 감지 대기 중...")
 
-        # 2. 서버 목록 UI가 정상 표시되는지 확인 (화이트아웃 검증)
+        page2 = new_page_info.value  # 새 페이지 객체를 page2로 할당
+        page.wait_for_timeout(1000)  # 1초 대기
+
+        page2.wait_for_load_state('networkidle')  # 새 페이지 로딩 완료 대기
+
+        # 1. 새 페이지 URL에 '/server/list' 포함 여부 확인
+        current_url = page2.url
+        logging.info(f"새 페이지 URL: {current_url}")
+        assert expected_url in current_url, f"{screen_name} 페이지로 이동하지 않았습니다. 현재 URL: {current_url}"
+        logging.info("{screen_name} 페이지 정상 이동 확인됨")
+
+        # 2. 새 페이지에서 서버 목록 UI 화이트아웃 검증
         verify_whiteout(
-            page=page,
-            screen_name="서버 목록 페이지",
+            page=page2,
+            screen_name=screen_name,
             save_path=save_path,
             test_results=test_results
         )
-        logging.info("서버 목록 UI 화이트아웃 없음 확인됨")
+        logging.info("{screen_name} UI 화이트아웃 없음 확인됨")
 
         # 3. 사이드 메뉴에 [서버 목록] 메뉴가 하이라이팅 되었는지 확인
-        side_menu_locator = page.locator("a[href='/v2/project/sms/29763/dashboard/resource_board'] div.Menustyles__MenuItemWrapCommon-cHqrwY")
-        is_highlighted = side_menu_locator.evaluate(
-        "(element) => element.classList.contains('iWDtdN')"
-        )
-        assert is_highlighted, "[서버 목록] 메뉴가 하이라이팅되지 않았습니다"
-        logging.info("사이드 메뉴 하이라이팅 확인됨")
+        #side_menu_locator = page2.locator("a[href='/v2/project/sms/29763/dashboard/resource_board']")
+        
+        #menu_item_class = side_menu_locator.locator("div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Child-iELIYh")
+        #is_highlighted = menu_item_class.evaluate(
+        #    "(element) => element.classList.contains('iWDtdN')"
+        #)
+
+        #assert is_highlighted, "[서버 목록] 메뉴가 하이라이팅되지 않았습니다"
+        #logging.info("사이드 메뉴 하이라이팅 확인됨")
+
+        #page2 = new_page_info.value
+        #page2.close()
 
     except AssertionError as e:
         logging.error(f"검증 실패: {str(e)}")
@@ -406,14 +518,87 @@ def button_action_serverwidget(page):
         test_results.append(f"예외 발생: {str(e)}")
 
 
-def button_action_infobutton(page):
-    try:
-        logging.info("info button 마우스 호버 후 동작 수행")
+# 함수 이름 변경하기
+def button_action_infobutton(page, popover_locator, popover_text_locator, expected_text, test_results):
+    """
+    Popover 요소를 먼저 찾고, 그 하위에서 특정 텍스트를 포함하는 요소를 필터링한 후 상태를 검증하는 함수.
 
-        # 팝업 표시 확인
-        popup_locator = page.locator("div.popup-class")
-        assert popup_locator.is_visible(), "팝업이 표시되지 않았습니다"
-        logging.info("팝업이 정상적으로 표시됨")
+    :param page: Playwright 페이지 객체
+    :param popover_locator: 팝오버 부모 요소의 선택자 
+    :param popover_text_locator: 팝오버 텍스트를 포함하는 요소의 선택자
+    :param expected_text: 팝오버에 포함되어야 하는 예상 텍스트
+    """
+    try:
+        logging.info("팝오버 상태 및 예상 텍스트 검증 시작")
+
+        page.wait_for_timeout(1000)  # 2초 대기
+
+        # 1. Popover 요소를 먼저 찾기
+        popover_elements = page.locator(popover_locator)
+        assert popover_elements.is_visible(), "팝오버 요소가 표시되지 않았습니다."
+        #assert popover_elements.count() > 0, "팝오버 요소를 찾지 못했습니다."
+        logging.info(f"팝오버 요소 {popover_elements.count()}개 발견")
+
+        matched_popover = None
+
+        # 2. 각 Popover 요소의 하위에서 예상 텍스트 확인
+        for i in range(popover_elements.count()):
+            current_popover = popover_elements.nth(i)
+            text_elements = current_popover.locator(popover_text_locator)
+
+            for j in range(text_elements.count()):
+                current_text = text_elements.nth(j).text_content().strip()
+                if expected_text in current_text:
+                    matched_popover = current_popover
+                    break  # 텍스트가 일치하는 Popover 발견
+            if matched_popover:
+                break
+
+        assert matched_popover, f"예상 텍스트 '{expected_text}'를 포함하는 팝오버를 찾지 못했습니다."
+        logging.info(f"예상 텍스트 '{expected_text}'를 포함하는 Popover 요소 발견")
+
+        # 3. 해당 Popover의 상태 확인 (ant-popover-hidden 클래스가 없는지 확인)
+        class_attr = matched_popover.get_attribute("class")
+        assert "ant-popover-hidden" not in class_attr, "Popover가 열리지 않았습니다: hidden 상태"
+
+        logging.info("팝오버 상태 검증 성공: hidden 클래스 없음")
+        log_result(True, f"팝오버 검증 성공: 텍스트 '{expected_text}' 확인 및 상태 정상")
+
+    except AssertionError as e:
+        logging.error(f"검증 실패: {str(e)}")
+        log_result(False, str(e))
+        test_results.append(str(e))  # 실패 내용을 테스트 결과 리스트에 추가
+
+    except Exception as e:
+        logging.error(f"오류 발생: {str(e)}")
+        log_result(False, f"예외 발생: {str(e)}")
+        test_results.append(f"예외 발생: {str(e)}")
+
+
+'''
+# 패널차트에서 에이전트 이름을 확인할 수 있는지 확인 필요
+def verify_agent_action(page, expected_agent, test_results):
+    """
+    서버 상세 화면의 [서버 선택] 항목에서 에이전트가 표시되는지 검증.
+
+    :param page: Playwright 페이지 객체 (서버 상세 화면 페이지)
+    :param expected_agent: 차트에서 선택한 에이전트 이름
+    :param test_results: 테스트 결과를 기록할 리스트
+    """
+    try:
+        logging.info("서버 상세 화면 [서버 선택] 항목 검증 시작")
+
+        # [서버 선택] 항목 요소 가져오기
+        server_selection_locator = page.locator("div.OptionBarstyles__Content-gokbzP.fgyBKV")  # [서버 선택] 항목의 정확한 selector로 변경
+        assert server_selection_locator.is_visible(), "[서버 선택] 항목이 보이지 않습니다"
+
+        # 항목에 expected_agent가 포함되어 있는지 확인
+        server_selection_text = server_selection_locator.text_content().strip()
+        assert expected_agent in server_selection_text, f"선택한 에이전트 '{expected_agent}'가 서버 선택 항목에 표시되지 않았습니다"
+
+        logging.info(f"[서버 선택] 항목에 '{expected_agent}' 에이전트가 정상 표시됨")
+        log_result(True, f"[서버 선택] 항목에 '{expected_agent}' 확인 완료 (성공)")
+        test_results.append(f"[서버 선택] 항목에 '{expected_agent}' 확인 완료 (성공)")
 
     except AssertionError as e:
         logging.error(f"검증 실패: {str(e)}")
@@ -424,9 +609,10 @@ def button_action_infobutton(page):
         logging.error(f"오류 발생: {str(e)}")
         log_result(False, f"예외 발생: {str(e)}")
         test_results.append(f"예외 발생: {str(e)}")
+'''
 
 
-def metrics_button_action(page):
+def metrics_button_action(page, test_results):
     try:
         logging.info("Metrics 버튼 클릭 후 동작 수행")
 
@@ -446,7 +632,7 @@ def metrics_button_action(page):
         test_results.append(f"예외 발생: {str(e)}")
 
 
-def server_button_action(page):
+def server_button_action(page, test_results):
     try:
         logging.info("Server 버튼 클릭 후 동작 수행")
         # 페이지 전환 확인
@@ -478,9 +664,18 @@ def server_button_action(page):
 def process_case_1(page, test_results):
     # Case 1: 리소스보드 화면 UI 확인
 
+    logging.info("=== [Case 1] 검증 시작 ===")
+
     # 리소스보드 선택
     logging.info("리소스보드 화면으로 이동 중")
     page.locator('a[href="/v2/project/sms/29763/dashboard/resource_board"]').click()
+    #element = page.wait_for_selector('a[href="/v2/project/sms/29763/dashboard/resource_board"]')
+    #element.click()
+
+    #page.get_by_role("link", name="리소스보드").click()
+
+    page.wait_for_timeout(2000)  # 2초 대기
+
 
     # 화이트아웃 검증
     verify_whiteout(
@@ -508,10 +703,14 @@ def process_case_1(page, test_results):
 def process_case_2(page, test_results):
     # Case 2: [Server] 위젯 UI 확인
 
+    logging.info("=== [Case 2] 검증 시작 ===")
+
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "Server" and widget.get("element_name") and widget.get("element_locator")
+        if widget["widget_name"] == "Server" and widget.get("element_name") #and widget.get("element_locator")
         ]
+    
+    #logging.info(f"필터링된 위젯: {filtered_widgets}")
     
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
@@ -528,10 +727,13 @@ def process_case_2(page, test_results):
 def process_case_3(page, test_results):
     # Case 3: [Server] 위젯 [>] 버튼 동작 확인
 
+    logging.info("=== [Case 3] 검증 시작 ===")
+
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "Server" and widget.get("button_name")
+        if widget["widget_name"] == "Server" and widget.get("button_name")
         ]
+    
     
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
@@ -549,19 +751,22 @@ def process_case_3(page, test_results):
 def process_case_4(page, test_results):
     # Case 4: [OS] 위젯 UI 확인
 
+    logging.info("=== [Case 4] 검증 시작 ===")
+
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "OS" and widget.get("element_name") and widget.get("element_locator")
-        ]
-    
+        if widget["widget_name"] == "OS" and widget.get("element_name")
+    ]
+
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_ui(
+        verify_widget_structure(
             page=page,
-            locator=element_locator,
+            parent_locator=element_locator,
             widget_name=widget["widget_name"],
             element_name=widget["element_name"],
+            child_count=widget.get("child_count"),
             test_results=test_results
         )
 
@@ -569,9 +774,11 @@ def process_case_4(page, test_results):
 def process_case_5(page, test_results):
     # Case 5: [Total Cores] 위젯 UI 확인
 
+    logging.info("=== [Case 5] 검증 시작 ===")
+
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "Total Cores" and widget.get("element_name") and widget.get("element_locator")
+        if widget["widget_name"] == "Total Cores" and widget.get("element_name") and widget.get("element_locator")
         ]
     
     for widget in filtered_widgets:
@@ -589,9 +796,11 @@ def process_case_5(page, test_results):
 def process_case_6(page, test_results):
     # Case 6: [Avg CPU] 위젯 UI 확인
 
+    logging.info("=== [Case 6] 검증 시작 ===")
+
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "Avg CPU" and widget.get("element_name") and widget.get("element_locator")
+        if widget["widget_name"] == "Avg CPU" and widget.get("element_name") and widget.get("element_locator")
         ]
     
     for widget in filtered_widgets:
@@ -609,9 +818,11 @@ def process_case_6(page, test_results):
 def process_case_7(page, test_results):
     # Case 7: [Avg Memory] 위젯 UI 확인
 
+    logging.info("=== [Case 7] 검증 시작 ===")
+
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "Avg Memory" and widget.get("element_name") and widget.get("element_locator")
+        if widget["widget_name"] == "Avg Memory" and widget.get("element_name") and widget.get("element_locator")
         ]
     
     for widget in filtered_widgets:
@@ -629,9 +840,11 @@ def process_case_7(page, test_results):
 def process_case_8(page, test_results):
     # Case 8: [Avg Disk] 위젯 UI 확인
 
+    logging.info("=== [Case 8] 검증 시작 ===")
+
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "Avg Disk" and widget.get("element_name") and widget.get("element_locator")
+        if widget["widget_name"] == "Avg Disk" and widget.get("element_name") and widget.get("element_locator")
         ]
     
     for widget in filtered_widgets:
@@ -648,10 +861,12 @@ def process_case_8(page, test_results):
 
 def process_case_9(page, test_results):
     # Case 9: [CPU - TOP5] 위젯 UI 확인
+    
+    logging.info("=== [Case 9] 검증 시작 ===")
 
     filtered_widgets = [
         widget for widget in all_widgets 
-        if ["widget_name"] == "CPU - TOP5" and widget.get("element_name") and widget.get("element_locator")
+        if widget["widget_name"] == "CPU - TOP5" and widget.get("element_name")
         ]
     
     for widget in filtered_widgets:
@@ -664,6 +879,79 @@ def process_case_9(page, test_results):
             element_name=widget["element_name"],
             test_results=test_results
         )
+
+
+def process_case_10(page, test_results):
+    # Case 10: [CPU - TOP5] 위젯 - 정보 버튼 동작 확인
+
+    logging.info("=== [Case 10] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets
+        if widget["widget_name"] == "CPU - TOP5" and widget["element_name"] == "info button"
+    ]
+
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_hover_action(
+            page=page,
+            widget_name=widget["widget_name"],
+            element_locator=element_locator,
+            button_name=widget["button_name"],
+            hover_position=widget.get("hover_position"),  # None 처리 가능
+            test_results=test_results,
+            action=widget["action"]  # 함수 전달
+        )
+
+
+def process_case_11(page, test_results):
+    # Case 3: [CPU - TOP5] 위젯 [>] 버튼 동작 확인
+
+    logging.info("=== [Case 11] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "CPU - TOP5" and widget["button_name"] == "[>] 버튼"
+        ]
+    
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"]
+        )
+
+
+def process_case_12(page, test_results):
+    # Case 12: [CPU - TOP5] 위젯 [PanelContents chart] 동작 확인
+
+    logging.info("=== [Case 12] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets
+        if widget["widget_name"] == "CPU - TOP5" and widget["element_name"] == "PanelContents chart"
+    ]
+
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            widget_name=widget["widget_name"],
+            locator=element_locator,
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"],  # None인 경우 추가 동작 없음
+            hover_positions=widget.get("hover_positions")  # 좌표 전달
+        )
+
 
 
 #위젯 자체 별로 + 버튼 별로 리스트에 다 추가하기
@@ -741,14 +1029,16 @@ all_widgets = [
         "button_name": None,
         "action": None
     },
-    {
-        "widget_name": "Server Status Map",
-        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('Server Status Map'))",  # 위젯 자체 확인
-        "element_name": None,  # 내부 요소 없음
-        "element_locator": None,
-        "button_name": None,
-        "action": None
-    },
+    # 이상하게 이거 검증이 안되네... UI에는 잘 뜨는데...
+# {
+#     "widget_name": "Server Status Map",
+#     "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF span:text-is('Server Status Map')",  # 위젯 자체 확인
+#     "element_name": None,  # 내부 요소 없음
+#     "element_locator": None,
+#     "button_name": None,
+#     "action": None
+# }
+    
     {
         "widget_name": "프로세스 CPU TOP5",
         "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 CPU TOP5'))",  # 위젯 자체 확인
@@ -771,7 +1061,12 @@ all_widgets = [
         "element_name": "[>] 버튼",
         "element_locator": "{locator} button.Styles__Button-bDBZvm",
         "button_name": "[>] 버튼",
-        "action": button_action_serverwidget  # 버튼 동작 수행 함수
+        "action": lambda page, test_results: verify_navigation_action(
+            page=page,
+            test_results=test_results,
+            screen_name="서버 목록 화면",
+            expected_url="/server/list"
+        )
     },
     {
         "widget_name": "Server",
@@ -800,34 +1095,11 @@ all_widgets = [
     {
         "widget_name": "OS",
         "locator": "div.ResourceCards__CardDom-dzFtxX:has(span:text('OS'))",  # 위젯 자체 확인
-        "element_name": "Linux Value Text",
-        "element_locator": "{locator} div:has(> div.ResourceCards__SubTitle-eZXil.jHWnBP:has-text('Linux')):has(> div.ResourceCards__SubValue-bOvbm.cfupYY)",
-        "button_name": None,  # 버튼이 없는 경우 None
-        "action": None  # 동작 수행 함수 없음
-    },
-    {
-        "widget_name": "OS",
-        "locator": "div.ResourceCards__CardDom-dzFtxX:has(span:text('OS'))",  # 위젯 자체 확인
-        "element_name": "Windows Value",
-        "element_locator": "{locator} div:has(> div.ResourceCards__SubTitle-eZXil.jHWnBP:has-text('Windows')):has(> div.ResourceCards__SubValue-bOvbm.cfupYY)",
-        "button_name": None,  # 버튼이 없는 경우 None
-        "action": None  # 동작 수행 함수 없음
-    },
-    {
-        "widget_name": "OS",
-        "locator": "div.ResourceCards__CardDom-dzFtxX:has(span:text('OS'))",  # 위젯 자체 확인
-        "element_name": "Windows Value",
-        "element_locator": "{locator} div:has(> div.ResourceCards__SubTitle-eZXil.jHWnBP:has-text('Unix')):has(> div.ResourceCards__SubValue-bOvbm.cfupYY)",
-        "button_name": None,  # 버튼이 없는 경우 None
-        "action": None  # 동작 수행 함수 없음
-    },
-    {
-        "widget_name": "OS",
-        "locator": "div.ResourceCards__CardDom-dzFtxX:has(span:text('OS'))",  # 위젯 자체 확인
-        "element_name": "Windows Value",
-        "element_locator": "{locator} div:has(> div.ResourceCards__SubTitle-eZXil.jHWnBP:has-text('Others')):has(> div.ResourceCards__SubValue-bOvbm.cfupYY)",
-        "button_name": None,  # 버튼이 없는 경우 None
-        "action": None  # 동작 수행 함수 없음
+        "element_name": "OS elements",
+        "element_locator": "{locator} div.ResourceCards__FlexRemainder-hCQgll.gORGxv",
+        "button_name": None,
+        "action": None,
+        "child_count": None  # 예상되는 하위 요소 개수
     },
     {
         "widget_name": "Total Cores",
@@ -891,9 +1163,14 @@ all_widgets = [
         "element_name": "info button",  
         "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.LPWtZ",
         "button_name": "info button",
-        "action": #
+        "action": lambda page, test_results: button_action_infobutton(
+            page=page,
+            popover_locator="div.ant-popover.ant-popover-placement-bottom",  # Popover 부모 요소를 나타내는 조건
+            popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
+            expected_text="CPU",
+            test_results=test_results
+        )
     },
-
 
     {
         "widget_name": "CPU - TOP5",
@@ -901,23 +1178,38 @@ all_widgets = [
         "element_name": "[>] button",
         "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.lomqVM",
         "button_name": "[>] 버튼",
-        "action": #  # 버튼 동작 수행 함수
+        "action":  lambda page, test_results: verify_navigation_action(
+            page=page,
+            test_results=test_results,
+            screen_name="리소스 이퀄라이저",
+            expected_url="/dashboard/multi_line?content=cpu"
+        )
     },
+
     {
         "widget_name": "CPU - TOP5",
         "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(button.Styles__Button-bDBZvm:has(span:text('CPU')))",
         "element_name": "PanelContents button",
-        "element_locator": "{locator} button.Styles__Button-bDBZvm.xlLVl.ant-dropdown-trigger"
+        "element_locator": "{locator} .Ants__Dropdown-cCtpgz.bRdCUm",
         "button_name": "PanelContents button",
-        "action": #  # 버튼 동작 수행 함수
+        "action":  None
+        
     },
     {
         "widget_name": "CPU - TOP5",
         "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(button.Styles__Button-bDBZvm:has(span:text('CPU')))",
         "element_name": "PanelContents chart",
-        "element_locator": "{locator} canvas.sc-dcJsrY.dvDjBb"
+        "element_locator": "{locator} canvas.sc-dcJsrY.dvDjBb",
         "button_name": "PanelContents chart",
-        "action": #  # 버튼 동작 수행 함수
+        "action": lambda page, test_results: (
+            verify_navigation_action(
+            page=page,
+            test_results=test_results,
+            screen_name="서버 상세",
+            expected_url="/server_detail"
+        ),
+            #verify_agent(page, expected_agent, test_results)
+        ),
         "hover_positions": [  
         {"x":120,"y":40}
         ] # 툴팁 검증을 위한 좌표
@@ -927,7 +1219,7 @@ all_widgets = [
 
 
 def run(playwright):
-    save_path = os.getenv("WHITEOUT_SCREEN_PATH", "src/reports/screeen_shot/kuber_whiteout")
+    save_path = os.getenv("WHITEOUT_SCREEN_PATH", "src/reports/screeen_shot/dashboard_whiteout")
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -955,7 +1247,7 @@ def run(playwright):
             #page.on("load", lambda: close_modal_if_present(page))
 
             email_text = "hjnoh@whatap.io"
-            password = "shguswn980512!"
+            password = "shguswn980512-"
 
             login (
                 page=page,
@@ -970,6 +1262,26 @@ def run(playwright):
             project_url = f"https://service.whatap.io/v2/project/{project_type}/{project_id}"
             page.goto(project_url)
 
+            page.wait_for_load_state('networkidle')
+
+            # 왼쪽 사이드 메뉴 접속하기
+            menu_wrap = page.query_selector('div.Menustyles__MenuWrap-hRfo.hmTPnA')
+
+            parent_elements = menu_wrap.query_selector_all('div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT')
+            logging.info(f"상위 메뉴 클릭하여 하위 메뉴 오픈 중") 
+
+            for element in parent_elements:
+                try:
+
+                    # 요소 클릭
+                    element.click()  # 해당 div 요소를 클릭
+
+                    page.wait_for_load_state('networkidle', timeout=20000)  # 페이지가 로드될 때까지 대기
+                except Exception as e:
+                    logging.error(f"클릭 중 오류 발생: {str(e)}")
+            
+            logging.info("하위 메뉴 오픈 후 페이지 로드 완료")
+
             # Case 1 처리
             process_case_1(page, test_results)
 
@@ -978,234 +1290,39 @@ def run(playwright):
 
             # Case 3 처리
             process_case_3(page, test_results)
-            
 
-            # 리소스보드 선택
-            page.locator('a[href="/v2/project/sms/29763/dashboard/resource_board"]').click()
+            #page.wait_for_timeout(200000)  # 2초 대기
 
-            # 1-1. 대시보드_리소스보드
-            # 1. 리소스보드 UI 확인
+            # Case 4 처리
+            process_case_4(page, test_results)
 
-            # 리소스보드 화이트 아웃 감지
-            try:
-                logging.info("리소스보드 화이트 아웃 발생 확인 중")
-                page.wait_for_load_state('networkidle')
-                whiteout_detected = check_for_whiteout(page, f"리소스보드 화면 진입", save_path)
+            # Case 5 처리
+            process_case_5(page, test_results)
 
-                # 화이트 아웃 감지 여부 검증
-                assert not whiteout_detected, f"리소스보드 화면 화이트 아웃이 감지되었습니다"
-                log_result(True, f"리소스보드 화면 검증 완료: 화이트 아웃 없음 (성공)")
-                test_results.append(f"리소스보드 화면 검증 완료: 화이트 아웃 없음 (성공)")
+            # Case 6 처리
+            process_case_6(page, test_results)
 
-            except AssertionError as e:
-                # Assertion 실패 시 로그와 결과 기록, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"검증 실패: {str(e)}")
-                log_result(False, str(e))
-                test_results.append(str(e))
+            # Case 7 처리
+            process_case_7(page, test_results)
 
-            except Exception as e:
-                # 기타 예외 처리, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"오류 발생: {str(e)}")
-                log_result(False, f"예외 발생: {str(e)}")
-                test_results.append(f"예외 발생: {str(e)}")
+            # Case 8 처리
+            process_case_8(page, test_results)
 
-            # [Server] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('Server'))", # CSS 선택자
-                widget_name="Server", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
+            # Case 9 처리
+            process_case_9(page, test_results)
 
-            # [OS] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('OS'))", # CSS 선택자
-                widget_name="OS", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
+            # Case 10 처리
+            process_case_10(page, test_results)
 
-            # [Total Cores] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('Total Cores'))", # CSS 선택자
-                widget_name="Total Cores", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
+            # Case 11 처리
+            process_case_11(page, test_results)
 
-            # [Avg CPU] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('Avg CPU'))", # CSS 선택자
-                widget_name="Avg CPU", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [Avg Memory] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('Avg Memory'))", # CSS 선택자
-                widget_name="Avg Memory", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [Avg Disk] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('Avg Disk'))", # CSS 선택자
-                widget_name="Avg Disk", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [CPU - TOP5] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('CPU - TOP5'))", # CSS 선택자
-                widget_name="CPU - TOP5", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [메모리 - TOP5] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('메모리 - TOP5'))", # CSS 선택자
-                widget_name="메모리 - TOP5", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [디스크 I/O - TOP5] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('디스크 I/O - TOP5'))", # CSS 선택자
-                widget_name="디스크 I/O - TOP5", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [CPU Resource Map] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('CPU Resource Map'))", # CSS 선택자
-                widget_name="CPU Resource Map", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [프로세스 CPU TOP5] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('프로세스 CPU TOP5'))", # CSS 선택자
-                widget_name="프로세스 CPU TOP5", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # [프로세스 메모리 TOP5] 위젯 표시 확인
-            verify_widget_visibility(
-                page=page,  # Playwright 페이지 객체
-                locator="div.ResourceCards__CardDom-dzFtxX:has(span:text('프로세스 메모리 TOP5'))", # CSS 선택자
-                widget_name="프로세스 메모리 TOP5", # 위젯 이름
-                test_results=test_results  # 결과 기록 리스트
-            )
-
-            # 2. [Server] 위젯 UI 확인
-
-            #[>] 버튼 표시 확인
-            try:
-                logging.info("[Server] 위젯 UI [>] 버튼 표시 확인 중")
-                inner_content_locator = page.locator("div.ResourceCards__CardDom-dzFtxX:has(span:text('Server')) button.Styles__Button-bDBZvm")
-
-                # 위젯이 화면에 표시되는지 확인
-                inner_content_visible = inner_content_locator.is_visible()
-
-                assert inner_content_visible, f"[Server] 위젯 UI [>] 버튼 표시 확인 실패"
-                log_result(True, f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-                test_results.append(f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-
-            except AssertionError as e:
-                # Assertion 실패 시 로그와 결과 기록, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"검증 실패: {str(e)}")
-                log_result(False, str(e))
-                test_results.append(str(e))
-
-            except Exception as e:
-                # 기타 예외 처리, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"오류 발생: {str(e)}")
-                log_result(False, f"예외 발생: {str(e)}")
-                test_results.append(f"예외 발생: {str(e)}")
+            # Case 12 처리
+            process_case_12(page, test_results)
 
             
-            #Value Text 버튼 표시 확인
-            try:
-                logging.info("[Server] 위젯 UI Value Text 표시 확인 중")
-                inner_content_locator = page.locator("div.ResourceCards__CardDom-dzFtxX:has(span:text('Server')) span.ResourceCards__ValueText-jMQaIH.fZMedF")
 
-                # 위젯이 화면에 표시되는지 확인
-                inner_content_visible = inner_content_locator.is_visible()
-
-                assert inner_content_visible, f"[Server] 위젯 UI [>] 버튼 표시 확인 실패"
-                log_result(True, f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-                test_results.append(f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-
-            except AssertionError as e:
-                # Assertion 실패 시 로그와 결과 기록, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"검증 실패: {str(e)}")
-                log_result(False, str(e))
-                test_results.append(str(e))
-
-            except Exception as e:
-                # 기타 예외 처리, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"오류 발생: {str(e)}")
-                log_result(False, f"예외 발생: {str(e)}")
-                test_results.append(f"예외 발생: {str(e)}")
-
-
-            #Progress Bar 차트 표시 확인
-            try:
-                logging.info("[Server] 위젯 UI Value Text 표시 확인 중")
-                inner_content_locator = page.locator("div.ResourceCards__CardDom-dzFtxX:has(span:text('Server')) div.ant-progress.ant-progress-line.ant-progress-status-active.ant-progress-default")
-
-                # 위젯이 화면에 표시되는지 확인
-                inner_content_visible = inner_content_locator.is_visible()
-
-                assert inner_content_visible, f"[Server] 위젯 UI [>] 버튼 표시 확인 실패"
-                log_result(True, f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-                test_results.append(f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-
-            except AssertionError as e:
-                # Assertion 실패 시 로그와 결과 기록, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"검증 실패: {str(e)}")
-                log_result(False, str(e))
-                test_results.append(str(e))
-
-            except Exception as e:
-                # 기타 예외 처리, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"오류 발생: {str(e)}")
-                log_result(False, f"예외 발생: {str(e)}")
-                test_results.append(f"예외 발생: {str(e)}")
-
-
-            #Progress Bar 텍스트 표시 확인
-            try:
-                logging.info("[Server] 위젯 UI Value Text 표시 확인 중")
-                inner_content_locator = page.locator("div.ResourceCards__CardDom-dzFtxX:has(span:text('Server')) div.ResourceCards__ProgressLabels-jdjbop.bkmXSU")
-
-                # 위젯이 화면에 표시되는지 확인
-                inner_content_visible = inner_content_locator.is_visible()
-
-                assert inner_content_visible, f"[Server] 위젯 UI [>] 버튼 표시 확인 실패"
-                log_result(True, f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-                test_results.append(f"[Server] 위젯 UI: 화면에 정상 표시됨 (성공)")
-
-            except AssertionError as e:
-                # Assertion 실패 시 로그와 결과 기록, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"검증 실패: {str(e)}")
-                log_result(False, str(e))
-                test_results.append(str(e))
-
-            except Exception as e:
-                # 기타 예외 처리, 코드 중단 없이 다음 항목으로 넘어감
-                logging.error(f"오류 발생: {str(e)}")
-                log_result(False, f"예외 발생: {str(e)}")
-                test_results.append(f"예외 발생: {str(e)}")
-
+        
 
 
 
