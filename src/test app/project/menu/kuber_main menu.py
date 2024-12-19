@@ -126,22 +126,24 @@ def run(playwright):
             # 페이지 전체에 대한 기본 타임아웃 설정
             context.set_default_timeout(120000)  # 120초로 설정
 
-            logging.info(f"{browser_type.name} - https://www.whatap.io/ 페이지로 이동 중...")
-            page.goto("https://www.whatap.io/")
+            #logging.info(f"{browser_type.name} - https://www.whatap.io/ 페이지로 이동 중...")
+            #page.goto("https://www.whatap.io/")
+            page.goto("http://preview.bundle.feature.whatap.io/v2/account/project/list")
 
             # 화이트 아웃 확인
-            page.wait_for_load_state('networkidle')
-            check_for_whiteout(page, "https://whatap.io/", save_path)
+            #page.wait_for_load_state('networkidle')
+            #check_for_whiteout(page, "https://whatap.io/", save_path)
 
-            logging.info(f"{browser_type.name} - 로그인 페이지로 이동 중...")
-            page.get_by_role("link", name="로그인").click()
+            #logging.info(f"{browser_type.name} - 로그인 페이지로 이동 중...")
+            #page.get_by_role("link", name="로그인").click()
 
             # 화이트 아웃 확인
-            page.wait_for_load_state('networkidle')
-            check_for_whiteout(page, "로그인 화면", save_path)
+            #page.wait_for_load_state('networkidle')
+            #check_for_whiteout(page, "로그인 화면", save_path)
 
             logging.info(f"{browser_type.name} - 이메일 및 비밀번호 입력 중...")
-            page.get_by_placeholder("Company Email").fill("hjnoh.automation@gmail.com")
+            #page.get_by_placeholder("Company Email").fill("hjnoh.automation@gmail.com")
+            page.get_by_placeholder("Company Email").fill("hjnoh@whatap.io")
             page.get_by_placeholder("Password").fill("shguswn980512-")  
             logging.info(f"{browser_type.name} - 로그인 버튼 클릭 중...")
             page.locator('#btn_login').click()
@@ -151,7 +153,7 @@ def run(playwright):
             check_for_whiteout(page, "로그인 버튼 누름", save_path)
 
             logging.info(f"{browser_type.name} - 쿠버 프로젝트 선택 중...")
-            page.goto("https://service.whatap.io/v2/project/cpm/33194/containerMap")
+            page.goto("http://preview.bundle.feature.whatap.io/v2/project/cpm/33194/containerMap")
 
             page.wait_for_load_state('networkidle') 
 
