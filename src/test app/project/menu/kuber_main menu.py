@@ -128,7 +128,8 @@ def run(playwright):
 
             #logging.info(f"{browser_type.name} - https://www.whatap.io/ 페이지로 이동 중...")
             #page.goto("https://www.whatap.io/")
-            page.goto("http://preview.bundle.feature.whatap.io/v2/account/project/list")
+            #page.goto("http://preview.bundle.feature.whatap.io/v2/account/project/list")
+            page.goto("http://preview.minify.feature.whatap.io")
 
             # 화이트 아웃 확인
             #page.wait_for_load_state('networkidle')
@@ -144,7 +145,7 @@ def run(playwright):
             logging.info(f"{browser_type.name} - 이메일 및 비밀번호 입력 중...")
             #page.get_by_placeholder("Company Email").fill("hjnoh.automation@gmail.com")
             page.get_by_placeholder("Company Email").fill("hjnoh@whatap.io")
-            page.get_by_placeholder("Password").fill("shguswn980512-")  
+            page.get_by_placeholder("Password").fill("shguswn980512!")  
             logging.info(f"{browser_type.name} - 로그인 버튼 클릭 중...")
             page.locator('#btn_login').click()
 
@@ -153,7 +154,9 @@ def run(playwright):
             check_for_whiteout(page, "로그인 버튼 누름", save_path)
 
             logging.info(f"{browser_type.name} - 쿠버 프로젝트 선택 중...")
-            page.goto("http://preview.bundle.feature.whatap.io/v2/project/cpm/33194/containerMap")
+            #page.goto("http://preview.bundle.feature.whatap.io/v2/project/cpm/33194/containerMap")
+            page.goto("http://preview.minify.feature.whatap.io/v2/project/database/57/instance_list")
+            
 
             page.wait_for_load_state('networkidle') 
 

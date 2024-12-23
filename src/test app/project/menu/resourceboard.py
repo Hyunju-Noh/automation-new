@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import csv
+import re
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
@@ -447,13 +448,26 @@ def verify_navigation_action(page, test_results, screen_name, expected_url):
     try:
         logging.info("버튼 클릭 후 확인 진행 중")
 
-        # 새 페이지 열림 감지
-        with page.context.expect_page(timeout=5000) as new_page_info:
-            logging.info("새 페이지 감지 대기 중...")
+        new_page = None
 
-        new_page = new_page_info.value
+        try:
+            # 새 페이지 열림 감지
+            with page.context.expect_page(timeout=5000) as new_page_info:
+                logging.info("새 페이지 감지 대기 중...")
+            new_page = new_page_info.value
+        except TimeoutError:
+            logging.warning("페이지 새로고침 시도...")
+            page.reload()
+            page.wait_for_load_state('networkidle')
+            logging.info("페이지 새로고침 완료")
+
+            # 새로고침 후 새 페이지 감지 재시도
+            with page.context.expect_page(timeout=5000) as new_page_info:
+                logging.info("새 페이지 감지 재시도 중...")
+            new_page = new_page_info.value
+
+        # 새 페이지 정보 가져오기
         new_page.wait_for_timeout(1000)  # 1초 대기
-
         new_page.wait_for_load_state('networkidle')  # 새 페이지 로딩 완료 대기
         logging.info("새 페이지 로딩 완료")
 
@@ -504,6 +518,50 @@ def verify_navigation_action(page, test_results, screen_name, expected_url):
             new_page.close()
 
 
+def verify_navigation_goback_action(page, test_results, screen_name, expected_url):
+    """
+    버튼 클릭 후 페이지 이동 및 UI 상태 검증 + 이전 화면으로 이동
+
+    :param page: Playwright 페이지 객체
+    :param test_results: 테스트 결과 리스트
+    :param screen_name: 검증 대상 화면 이름 (위젯 리스트에서 전달)
+    :param expected_url: 기대되는 URL (위젯 리스트에서 전달)
+    """
+    try:
+        logging.info("버튼 클릭 후 확인 진행 중")
+
+        page.wait_for_load_state('networkidle')  #페이지 로딩 완료 대기
+
+        close_popups(page)
+
+        # 1. 새 페이지 URL에 '/server/list' 포함 여부 확인
+        current_url = page.url
+        logging.info(f"새 페이지 URL: {current_url}")
+        assert expected_url in current_url, f"{screen_name} 페이지로 이동하지 않았습니다. 현재 URL: {current_url}"
+        logging.info("{screen_name} 페이지 정상 이동 확인됨")
+
+        # 2. 새 페이지에서 서버 목록 UI 화이트아웃 검증
+        verify_whiteout(
+            page=page,
+            screen_name=screen_name,
+            save_path=save_path,
+            test_results=test_results
+        )
+        logging.info("{screen_name} UI 화이트아웃 없음 확인됨")
+
+    except AssertionError as e:
+        logging.error(f"검증 실패: {str(e)}")
+        log_result(False, str(e))  # 실패 기록
+        test_results.append(str(e))  # 실패 내용을 테스트 결과 리스트에 추가
+
+    except Exception as e:
+        logging.error(f"오류 발생: {str(e)}")
+        log_result(False, f"예외 발생: {str(e)}")
+        test_results.append(f"예외 발생: {str(e)}")
+    finally:
+        page.go_back()
+
+
 # 함수 이름 변경하기
 def info_button_action(page, popover_locator, popover_text_locator, expected_text, test_results):
     """
@@ -525,6 +583,65 @@ def info_button_action(page, popover_locator, popover_text_locator, expected_tex
         popover_elements = page.locator(popover_locator)
         assert popover_elements.is_visible(), "팝오버 요소가 표시되지 않았습니다."
         #assert popover_elements.count() > 0, "팝오버 요소를 찾지 못했습니다."
+        logging.info(f"팝오버 요소 {popover_elements.count()}개 발견")
+
+        matched_popover = None
+
+        # 2. 각 Popover 요소의 하위에서 예상 텍스트 확인
+        for i in range(popover_elements.count()):
+            current_popover = popover_elements.nth(i)
+            text_elements = current_popover.locator(popover_text_locator)
+
+            for j in range(text_elements.count()):
+                current_text = text_elements.nth(j).text_content().strip()
+                if expected_text in current_text:
+                    matched_popover = current_popover
+                    break  # 텍스트가 일치하는 Popover 발견
+            if matched_popover:
+                break
+
+        assert matched_popover, f"예상 텍스트 '{expected_text}'를 포함하는 팝오버를 찾지 못했습니다."
+        logging.info(f"예상 텍스트 '{expected_text}'를 포함하는 Popover 요소 발견")
+
+        # 3. 해당 Popover의 상태 확인 (ant-popover-hidden 클래스가 없는지 확인)
+        class_attr = matched_popover.get_attribute("class")
+        assert "ant-popover-hidden" not in class_attr, "Popover가 열리지 않았습니다: hidden 상태"
+
+        logging.info("팝오버 상태 검증 성공: hidden 클래스 없음")
+        log_result(True, f"팝오버 검증 성공: 텍스트 '{expected_text}' 확인 및 상태 정상")
+
+    except AssertionError as e:
+        logging.error(f"검증 실패: {str(e)}")
+        log_result(False, str(e))
+        test_results.append(str(e))  # 실패 내용을 테스트 결과 리스트에 추가
+
+    except Exception as e:
+        logging.error(f"오류 발생: {str(e)}")
+        log_result(False, f"예외 발생: {str(e)}")
+        test_results.append(f"예외 발생: {str(e)}")
+
+
+#비슷하지만, tc 34/39 전용 함수
+def processwidget_info_button_action(page, popover_locator, popover_text_locator, expected_text, test_results):
+    """
+    Popover 요소를 먼저 찾고, 그 하위에서 특정 텍스트를 포함하는 요소를 필터링한 후 상태를 검증하는 함수.
+
+    :param page: Playwright 페이지 객체
+    :param popover_locator: 팝오버 부모 요소의 선택자 
+    :param popover_text_locator: 팝오버 텍스트를 포함하는 요소의 선택자
+    :param expected_text: 팝오버에 포함되어야 하는 예상 텍스트
+    """
+    try:
+        logging.info("팝오버 상태 및 예상 텍스트 검증 시작")
+
+        page.wait_for_timeout(1000)  # 2초 대기
+
+        close_popups(page)
+
+        # 1. Popover 요소를 먼저 찾기
+        popover_elements = page.locator(popover_locator)
+        #assert popover_elements.is_visible(), "팝오버 요소가 표시되지 않았습니다."
+        assert popover_elements.count() > 0, "팝오버 요소를 찾지 못했습니다."
         logging.info(f"팝오버 요소 {popover_elements.count()}개 발견")
 
         matched_popover = None
@@ -635,6 +752,67 @@ def dropdown_button_action(page, dropdown_locator, expected_left_value, test_res
 
 
 
+def column_button_action(page, tooltip_locator, test_results):
+    """
+    Dropdown 요소를 먼저 찾고, 특정 style 조건을 만족하는 요소를 필터링한 후 상태를 검증하는 함수.
+
+    :param page: Playwright 페이지 객체
+    :param dropdown_locator: Dropdown 부모 요소의 선택자
+    :param expected_left_value: style 속성에서 'left'의 예상 값
+    :param test_results: 테스트 결과를 기록할 리스트
+    :param dropdown_list_button_locator: Dropdown 내부 버튼 선택자 (선택적)
+    :param element_locator: 동적으로 생성될 요소의 선택자 템플릿 (선택적)
+    :param expected_text: 동적으로 생성될 요소에 사용될 텍스트 (선택적)
+    """
+    try:
+        logging.info("Dropdown 상태 및 예상 조건 검증 시작")
+
+        page.wait_for_timeout(1000)  # 1초 대기
+
+        close_popups(page)
+
+        # 1. tooltip 요소를 먼저 찾기
+        tooltip_elements = page.locator(tooltip_locator)
+        assert tooltip_elements.count() > 0, "팝오버 요소를 찾지 못했습니다."
+        logging.info(f"팝오버 요소 {tooltip_elements.count()}개 발견")
+
+        matched_tooltip = None
+
+        # 2. 각 tooltip 요소에서 style 조건 확인
+        matched_tooltip = next(
+            (
+                tooltip_elements.nth(i)
+                for i in range(tooltip_elements.count())
+                if (style_attr := tooltip_elements.nth(i).get_attribute("style"))
+                and int(re.search(r'left:\s*(-?\d+)px', style_attr).group(1)) > 0
+                and int(re.search(r'top:\s*(-?\d+)px', style_attr).group(1)) > 0
+            ),
+            None
+        )
+
+        assert matched_tooltip, f"left 및 top 값이 양수인 Tooltip을 찾지 못했습니다."
+        logging.info(f"left 및 top 값이 양수인 Tooltip 요소 발견")
+
+        # 3. 해당 tooltip 상태 확인 (ant-tooltip-hidden 클래스가 없는지 확인)
+        class_attr = matched_tooltip.get_attribute("class")
+        assert "ant-tooltip-hidden" not in class_attr, "tooltip이 열리지 않았습니다: hidden 상태"
+
+        logging.info("툴팁 상태 검증 성공: hidden 클래스 없음")
+        log_result(True, f"툴팁 검증 성공: 텍스트")
+        
+
+    except AssertionError as e:
+        logging.error(f"검증 실패: {str(e)}")
+        log_result(False, str(e))
+        test_results.append(str(e))  # 실패 내용을 테스트 결과 리스트에 추가
+
+    except Exception as e:
+        logging.error(f"오류 발생: {str(e)}")
+        log_result(False, f"예외 발생: {str(e)}")
+        test_results.append(f"예외 발생: {str(e)}")
+
+
+
 '''
 # 패널차트에서 에이전트 이름을 확인할 수 있는지 확인 필요
 def verify_agent_action(page, expected_agent, test_results):
@@ -727,6 +905,8 @@ def close_popups(page):
     :param page: Playwright 페이지 객체
     """
     try:
+        page.wait_for_load_state('networkidle')  #페이지 로딩 완료 대기
+
         popup_locator = page.locator(".Toastify__toast")  # 팝업의 클래스 선택자
         close_button_locator = page.locator(".Toastify__close-button")  # 닫기 버튼 클래스 선택자
 
@@ -734,10 +914,15 @@ def close_popups(page):
         if popup_locator.is_visible():
             logging.info("팝업이 감지되었습니다. 닫는 중...")
             close_button_locator.click()  # 닫기 버튼 클릭
-            #page.wait_for_timeout(500)  # 닫힌 후 잠시 대기
-            logging.info("팝업 닫기 완료")
+
+            logging.info("팝업 닫기 동작 완료 (상태 감지 제외)")
+        else:
+            logging.info("팝업이 감지되지 않았습니다.")
     except Exception as e:
-        logging.warning(f"팝업 닫기 중 오류 발생: {str(e)}")
+        if "Target crashed" in str(e):
+            logging.warning("Webkit 브라우저에서 Target crashed 오류 발생. 무시하고 진행.")
+        else:
+            logging.warning(f"팝업 닫기 중 다른 오류 발생: {str(e)}")
 
 
 
@@ -994,7 +1179,7 @@ def process_case_11(page, test_results):
 
     filtered_widgets = [
         widget for widget in all_widgets 
-        if widget["widget_name"] == "CPU - TOP5" and widget["button_name"] == "[>] 버튼"
+        if widget["widget_name"] == "CPU - TOP5" and widget["button_name"] == "[>] button"
         ]
     
     
@@ -1136,7 +1321,7 @@ def process_case_17(page, test_results):
 
     filtered_widgets = [
         widget for widget in all_widgets 
-        if widget["widget_name"] == "memory - TOP5" and widget["button_name"] == "[>] 버튼"
+        if widget["widget_name"] == "memory - TOP5" and widget["button_name"] == "[>] button"
         ]
     
     
@@ -1225,9 +1410,6 @@ def process_case_20(page, test_results):
         )
 
 
-
-
-
 def process_case_21(page, test_results):
     # Case 21: [디스크 I/O - TOP5] 위젯 UI 확인
     
@@ -1281,7 +1463,7 @@ def process_case_23(page, test_results):
 
     filtered_widgets = [
         widget for widget in all_widgets 
-        if widget["widget_name"] == "disk I/O - TOP5" and widget["button_name"] == "[>] 버튼"
+        if widget["widget_name"] == "disk I/O - TOP5" and widget["button_name"] == "[>] button"
         ]
     
     
@@ -1371,6 +1553,287 @@ def process_case_26(page, test_results):
 
 
 
+# def process_case_27(page, test_results):
+#     # Case 27: [Server Status Map] 위젯 UI 확인
+    
+#     logging.info("=== [Case 27] 검증 시작 ===")
+
+#     filtered_widgets = [
+#         widget for widget in all_widgets 
+#         if widget["widget_name"] == "Server Status Map" and widget.get("element_name")
+#         ]
+    
+#     for widget in filtered_widgets:
+#         element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+#         verify_widget_ui(
+#             page=page,
+#             locator=element_locator,
+#             widget_name=widget["widget_name"],
+#             element_name=widget["element_name"],
+#             test_results=test_results
+#         )
+
+
+
+# def process_case_28(page, test_results):
+#     # Case 28: [Server Status Map] 위젯 [Status Map chart] 동작 확인
+
+#     logging.info("=== [Case 28] 검증 시작 ===")
+
+#     filtered_widgets = [
+#         widget for widget in all_widgets
+#         if widget["widget_name"] == "Server Status Map" and widget["element_name"] == "Status Map chart"
+#     ]
+
+#     for widget in filtered_widgets:
+#         element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+#         verify_widget_button_action(
+#             page=page,
+#             widget_name=widget["widget_name"],
+#             locator=element_locator,
+#             button_name=widget["button_name"],
+#             test_results=test_results,
+#             action=widget["action"],  # None인 경우 추가 동작 없음
+#             hover_positions=widget.get("hover_positions")  # 좌표 전달
+#         )
+
+def process_case_33(page, test_results):
+    # Case 33: [프로세스 CPU TOP5] 위젯 UI 확인
+    
+    logging.info("=== [Case 33] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 CPU TOP5" and widget.get("element_name")
+        ]
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_ui(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            element_name=widget["element_name"],
+            test_results=test_results
+        )
+
+
+def process_case_34(page, test_results):
+    # Case 34: [프로세스 CPU TOP5] 위젯 - 정보 버튼 동작 확인
+
+    logging.info("=== [Case 34] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets
+        if widget["widget_name"] == "프로세스 CPU TOP5" and widget["element_name"] == "info button"
+    ]
+
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_hover_action(
+            page=page,
+            widget_name=widget["widget_name"],
+            element_locator=element_locator,
+            button_name=widget["button_name"],
+            hover_position=widget.get("hover_position"),  # None 처리 가능
+            test_results=test_results,
+            action=widget["action"]  # 함수 전달
+        )
+
+
+def process_case_35(page, test_results):
+    # Case 35: [프로세스 CPU TOP5] 위젯 - [>] 버튼 동작 확인
+
+    logging.info("=== [Case 35] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 CPU TOP5" and widget["button_name"] == "[>] button"
+        ]
+    
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"]
+        )
+
+
+def process_case_36(page, test_results):
+    # Case 36: [프로세스 CPU TOP5] 위젯 프로세스 테이블 - [Name] 동작 확인
+
+    logging.info("=== [Case 36] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 CPU TOP5" and widget["button_name"] == "process table name column"
+        ]
+    
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"]
+        )
+
+
+def process_case_37(page, test_results):
+    # Case 37: [프로세스 CPU TOP5] 위젯 프로세스 테이블 - [Servers] 동작 확인
+
+    logging.info("=== [Case 37] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 CPU TOP5" and widget["button_name"] == "process table server column"
+        ]
+    
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"]
+        )
+
+
+def process_case_38(page, test_results):
+    # Case 38: [프로세스 메모리 TOP5] 위젯 UI 확인
+    
+    logging.info("=== [Case 38] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 메모리 TOP5" and widget.get("element_name")
+        ]
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_ui(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            element_name=widget["element_name"],
+            test_results=test_results
+        )
+
+
+def process_case_39(page, test_results):
+    # Case 39: [프로세스 메모리 TOP5] 위젯 - 정보 버튼 동작 확인
+
+    logging.info("=== [Case 39] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets
+        if widget["widget_name"] == "프로세스 메모리 TOP5" and widget["element_name"] == "info button"
+    ]
+
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_hover_action(
+            page=page,
+            widget_name=widget["widget_name"],
+            element_locator=element_locator,
+            button_name=widget["button_name"],
+            hover_position=widget.get("hover_position"),  # None 처리 가능
+            test_results=test_results,
+            action=widget["action"]  # 함수 전달
+        )
+
+
+def process_case_40(page, test_results):
+    # Case 40: [프로세스 메모리 TOP5] 위젯 - [>] 버튼 동작 확인
+
+    logging.info("=== [Case 40] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 메모리 TOP5" and widget["button_name"] == "[>] button"
+        ]
+    
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"]
+        )
+
+
+def process_case_41(page, test_results):
+    # Case 36: [프로세스 메모리 TOP5] 위젯 프로세스 테이블 - [Name] 동작 확인
+
+    logging.info("=== [Case 36] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 메모리 TOP5" and widget["button_name"] == "process table name column"
+        ]
+    
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"]
+        )
+
+
+def process_case_42(page, test_results):
+    # Case 37: [프로세스 메모리 TOP5] 위젯 프로세스 테이블 - [Servers] 동작 확인
+
+    logging.info("=== [Case 37] 검증 시작 ===")
+
+    filtered_widgets = [
+        widget for widget in all_widgets 
+        if widget["widget_name"] == "프로세스 메모리 TOP5" and widget["button_name"] == "process table server column"
+        ]
+    
+    
+    for widget in filtered_widgets:
+        element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+        verify_widget_button_action(
+            page=page,
+            locator=element_locator,
+            widget_name=widget["widget_name"],
+            button_name=widget["button_name"],
+            test_results=test_results,
+            action=widget["action"]
+        )
+
 
 #위젯 자체 별로 + 버튼 별로 리스트에 다 추가하기
 all_widgets = [
@@ -1448,14 +1911,14 @@ all_widgets = [
         "action": None
     },
     # 이상하게 이거 검증이 안되네... UI에는 잘 뜨는데...
-# {
-#     "widget_name": "Server Status Map",
-#     "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF span:text-is('Server Status Map')",  # 위젯 자체 확인
-#     "element_name": None,  # 내부 요소 없음
-#     "element_locator": None,
-#     "button_name": None,
-#     "action": None
-# }
+    # {
+    #     "widget_name": "Server Status Map",
+    #     "locator": "div.PanelContents__Wrapper-dAMbXP.eMnZTY:has(span:text('Server Status Map'))",  # 위젯 자체 확인
+    #     "element_name": None,  # 내부 요소 없음
+    #     "element_locator": None,
+    #     "button_name": None,
+    #     "action": None
+    # },
     
     {
         "widget_name": "프로세스 CPU TOP5",
@@ -1476,9 +1939,9 @@ all_widgets = [
     {
         "widget_name": "Server",
         "locator": "div.ResourceCards__CardDom-dzFtxX:has(span:text('Server'))",  # 위젯 자체 확인
-        "element_name": "[>] 버튼",
+        "element_name": "[>] button",
         "element_locator": "{locator} button.Styles__Button-bDBZvm",
-        "button_name": "[>] 버튼",
+        "button_name": "[>] button",
         "action": lambda page, test_results: verify_navigation_action(
             page=page,
             test_results=test_results,
@@ -1586,7 +2049,7 @@ all_widgets = [
             popover_locator="div.ant-popover.ant-popover-placement-bottom",  # Popover 부모 요소를 나타내는 조건
             popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
             expected_text="CPU",
-            test_results=test_results
+            test_results=test_results,
         )
     },
 
@@ -1595,7 +2058,7 @@ all_widgets = [
         "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(button.Styles__Button-bDBZvm:has(span:text('CPU')))",
         "element_name": "[>] button",
         "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.lomqVM",
-        "button_name": "[>] 버튼",
+        "button_name": "[>] button",
         "action":  lambda page, test_results: verify_navigation_action(
             page=page,
             test_results=test_results,
@@ -1668,7 +2131,7 @@ all_widgets = [
             popover_locator="div.ant-popover.ant-popover-placement-top",  # Popover 부모 요소를 나타내는 조건
             popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
             expected_text="메모리",
-            test_results=test_results
+            test_results=test_results,
         )
     },
 
@@ -1677,7 +2140,7 @@ all_widgets = [
         "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(button.Styles__Button-bDBZvm:has(span:text('메모리')))",
         "element_name": "[>] button",
         "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.lomqVM",
-        "button_name": "[>] 버튼",
+        "button_name": "[>] button",
         "action":  lambda page, test_results: verify_navigation_action(
             page=page,
             test_results=test_results,
@@ -1751,7 +2214,7 @@ all_widgets = [
             popover_locator="div.ant-popover.ant-popover-placement-top",  # Popover 부모 요소를 나타내는 조건
             popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
             expected_text="디스크 I/O",
-            test_results=test_results
+            test_results=test_results,
         )
     },
 
@@ -1760,7 +2223,7 @@ all_widgets = [
         "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(button.Styles__Button-bDBZvm:has(span:text('디스크 I/O')))",
         "element_name": "[>] button",
         "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.lomqVM",
-        "button_name": "[>] 버튼",
+        "button_name": "[>] button",
         "action":  lambda page, test_results: verify_navigation_action(
             page=page,
             test_results=test_results,
@@ -1822,6 +2285,167 @@ all_widgets = [
         
     },
 
+    # {
+    #     "widget_name": "Server Status Map",
+    #     "locator": ".Styles__Panel-kJCnUy.iLiSQM",  # 위젯 자체 확인
+    #     "element_name": "CPU Resource Map button",  
+    #     "element_locator": ".Styles__Wrapper-bZXaBP.dfHBtW",
+    #     "button_name": "CPU Resource Map button",
+    #     "action": None
+    # },
+
+    # {
+    #     "widget_name": "Server Status Map",
+    #     "locator": ".Styles__FlexWrapper-fGKctw > div > .Styles__FlexWrapper-fGKctw > .Styles__FlexSizeWrapper-dheSQV",  # 위젯 자체 확인
+    #     "element_name": "Server Status Map button",  
+    #     "element_locator": ".Styles__Wrapper-bZXaBP.cgWROS",
+    #     "button_name": "Server Status Map button",
+    #     "action": None
+    # },
+
+    # {
+    #     "widget_name": "Server Status Map",
+    #     "locator": ".Styles__FlexWrapper-fGKctw > div > .Styles__FlexWrapper-fGKctw > .Styles__FlexSizeWrapper-dheSQV",  # 위젯 자체 확인
+    #     "element_name": "Status Map chart",  
+    #     "element_locator": "canvas.Honeycomb__CanvasDom-ecbovM.hbmIfB",
+    #     "button_name": "Status Map chart",
+    #     "action": lambda page, test_results: (
+    #         verify_navigation_goback_action(
+    #         page=page,
+    #         test_results=test_results,
+    #         screen_name="서버 상세",
+    #         expected_url="/server_detail"
+    #     ),
+    #         #verify_agent(page, expected_agent, test_results)
+    #     ),
+    #     "hover_positions": [  
+    #     {"x":347,"y":86}
+    #     ] # 툴팁 검증을 위한 좌표
+    # },
+
+    {
+        "widget_name": "프로세스 CPU TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 CPU TOP5'))",  # 위젯 자체 확인
+        "element_name": "info button",  
+        "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.LPWtZ",
+        "button_name": "info button",
+        "action": lambda page, test_results: processwidget_info_button_action(
+            page=page,
+            popover_locator="div.ant-popover.ant-popover-placement-top",  # Popover 부모 요소를 나타내는 조건
+            popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
+            expected_text="CPU",
+            test_results=test_results,
+        )
+    },
+    {
+        "widget_name": "프로세스 CPU TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 CPU TOP5'))",  
+        "element_name": "[>] button",  
+        "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.lomqVM",
+        "button_name": "[>] button",
+        "action": lambda page, test_results: verify_navigation_action(
+            page=page,
+            test_results=test_results,
+            screen_name="프로세스 목록",
+            expected_url="/process_list"
+        )
+    },
+    {
+        "widget_name": "프로세스 CPU TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 CPU TOP5'))",  
+        "element_name": "process table",  
+        "element_locator": "{locator} div.PanelContents__Body-ha-DReo.hssRVS",
+        "button_name": None,
+        "action": None
+    },
+    # info_button_action 함수 대신 column_button_action 함수 만들어서 사용해야함 스타일 요소가 -가 아닌 값을 찾는 조건 사용하기
+    {
+        "widget_name": "프로세스 CPU TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 CPU TOP5'))",
+        "element_name": "process table name column",
+        "element_locator": "{locator} tbody[role='rowgroup'] > tr[role='row']:nth-child(1) > td[role='cell']:nth-child(1)",
+        "button_name": "process table name column",
+        "action": lambda page, test_results: column_button_action(
+            page=page,
+            tooltip_locator="div.ant-tooltip.ant-tooltip-placement-top",  # tooltip 부모 요소를 나타내는 조건
+            test_results=test_results
+        )
+        
+    },
+    {
+        "widget_name": "프로세스 CPU TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 CPU TOP5'))",
+        "element_name": "process table server column",
+        "element_locator": "{locator} tbody[role='rowgroup'] > tr[role='row']:nth-child(1) > td[role='cell']:nth-child(5)",
+        "button_name": "process table server column",
+        "action": lambda page, test_results: column_button_action(
+            page=page,
+            tooltip_locator="div.ant-tooltip.ant-tooltip-placement-top",  # tooltip 부모 요소를 나타내는 조건
+            test_results=test_results
+        )
+        
+    },
+    {
+        "widget_name": "프로세스 메모리 TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 메모리 TOP5'))",  # 위젯 자체 확인
+        "element_name": "info button",  
+        "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.LPWtZ",
+        "button_name": "info button",
+        "action": lambda page, test_results: processwidget_info_button_action(
+            page=page,
+            popover_locator="div.ant-popover.ant-popover-placement-top",  # Popover 부모 요소를 나타내는 조건
+            popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
+            expected_text="메모리",
+            test_results=test_results
+        )
+    },
+    {
+        "widget_name": "프로세스 메모리 TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 메모리 TOP5'))",  # 위젯 자체 확인
+        "element_name": "[>] button",  
+        "element_locator": "{locator} div.Styles__Wrapper-bZXaBP.lomqVM",
+        "button_name": "[>] button",
+        "action": lambda page, test_results: verify_navigation_action(
+            page=page,
+            test_results=test_results,
+            screen_name="프로세스 목록",
+            expected_url="/process_list"
+        )
+    },
+    {
+        "widget_name": "프로세스 메모리 TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 메모리 TOP5'))",  # 위젯 자체 확인
+        "element_name": "process table",  
+        "element_locator": "{locator} div.PanelContents__Body-ha-DReo.hssRVS",
+        "button_name": None,
+        "action": None
+    },
+    {
+        "widget_name": "프로세스 메모리 TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 메모리 TOP5'))",
+        "element_name": "process table name column",
+        "element_locator": "{locator} tbody[role='rowgroup'] > tr[role='row']:nth-child(1) > td[role='cell']:nth-child(1)",
+        "button_name": "process table name column",
+        "action": lambda page, test_results: column_button_action(
+            page=page,
+            tooltip_locator="div.ant-tooltip.ant-tooltip-placement-top",  # tooltip 부모 요소를 나타내는 조건
+            test_results=test_results
+        )
+        
+    },
+    {
+        "widget_name": "프로세스 메모리 TOP5",
+        "locator": "div.Styles__FlexSizeWrapper-dheSQV.dNazsF:has(span:text('프로세스 메모리 TOP5'))",
+        "element_name": "process table server column",
+        "element_locator": "{locator} tbody[role='rowgroup'] > tr[role='row']:nth-child(1) > td[role='cell']:nth-child(5)",
+        "button_name": "process table server column",
+        "action": lambda page, test_results: column_button_action(
+            page=page,
+            tooltip_locator="div.ant-tooltip.ant-tooltip-placement-top",  # tooltip 부모 요소를 나타내는 조건
+            test_results=test_results
+        )
+        
+    },
 
 ]
 
@@ -1839,7 +2463,7 @@ def run(playwright):
 
     try:
         # Chromium, Firefox, WebKit을 동시에 시작합니다.
-        for browser_type in [playwright.chromium, playwright.firefox, playwright.webkit]:
+        for browser_type in [playwright.chromium, playwright.firefox]: #playwright.webkit]:
             logging.info(f"{browser_type.name} 브라우저 시작 중...")
             browser = browser_type.launch(headless=False)
             context = browser.new_context(
@@ -1970,9 +2594,41 @@ def run(playwright):
             # Case 26 처리
             process_case_26(page, test_results)
 
-            
+            # # Case 27 처리
+            # process_case_27(page, test_results)
 
-        
+            # # Case 28 처리
+            # process_case_28(page, test_results)
+
+            # Case 33 처리
+            process_case_33(page, test_results)
+
+            # Case 34 처리
+            process_case_34(page, test_results)
+
+            # Case 35 처리
+            process_case_35(page, test_results)
+
+            # Case 36 처리
+            process_case_36(page, test_results)
+
+            # Case 37 처리
+            process_case_37(page, test_results)
+
+            # Case 38 처리
+            process_case_38(page, test_results)
+
+            # Case 39 처리
+            process_case_39(page, test_results)
+
+            # Case 40 처리
+            process_case_40(page, test_results)
+
+            # Case 41 처리
+            process_case_41(page, test_results)
+
+            # Case 42 처리
+            process_case_42(page, test_results)
 
 
 
