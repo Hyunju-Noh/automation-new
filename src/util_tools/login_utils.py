@@ -4,7 +4,8 @@ from pages.account.loginpage import LoginPage  # 페이지 객체가 위치한 �
 from playwright.sync_api import Playwright
 
 # 로그인 상태가 저장될 세션 디렉토리와 파일 설정
-login_session_dir = "src/data/sessions"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+login_session_dir = os.path.join(BASE_DIR, "data/sessions")
 login_session_file = "login_state.json"
 login_session_path = os.path.join(login_session_dir, login_session_file)
 
@@ -23,7 +24,7 @@ def login_session(playwright: Playwright) -> str:
         # 로그인 동작 수행
         login_page = LoginPage(page)
         login_page.open()
-        login_page.success({"username": "hjnoh@whatap.io", "password": "test1212!"})
+        login_page.success({"username": "hjnoh@whatap.io", "password": "shguswn980512-"})
         
         # 로그인된 상태를 저장
         context.storage_state(path=login_session_path)
