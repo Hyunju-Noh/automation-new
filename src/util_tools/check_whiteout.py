@@ -55,7 +55,26 @@ def check_for_whiteout(page, button_text, save_path, whiteout_texts):
         
         if found_text:
             logging.error(f"화이트아웃 화면 감지: '{found_text}' 특정 텍스트 발견")
-            screenshot_path = capture_screenshot(page, f"whiteout_screen_{found_text}.png", save_path)
+            #screenshot_path = capture_screenshot(page, f"whiteout_screen_{found_text}.png", save_path)
+
+            # 새로고침 시도 및 다시 확인
+            logging.info("화이트아웃 감지: 페이지 새로고침 시도")
+            page.reload()
+            page.wait_for_load_state('networkidle', timeout=10000)  # 새로고침 후 대기
+
+            # 새로고침 후 다시 컨텐츠 확인
+            page_content = get_page_content_with_timeout(page, timeout=10000)
+            found_text_after_refresh = None
+            for text in whiteout_texts:
+                if text in page_content:
+                    found_text = text
+                    break
+
+            if found_text_after_refresh:
+                logging.error(f"새로고침 후에도 화이트아웃 화면 감지: '{found_text_after_refresh}' 특정 텍스트 발견")
+                screenshot_path = capture_screenshot(page, f"whiteout_screen_{found_text}.png", save_path)
+            else:
+                return  # 새로고침 후 정상 상태면 함수 종료
             
             # 화이트 아웃 발생 원인 버튼의 텍스트를 출력
             button_element = page.query_selector(f"//*[text()='{button_text}']")

@@ -101,13 +101,6 @@ def get_page_content_with_timeout(page, timeout):
             time.sleep(1)
 
 
-''' 모달 팝업을 잡는 함수가 아님. 브라우저 팝업을 잡는 함수임
-def handle_dialog(dialog):
-    global popup_detected
-    logging.info(f"팝업 감지됨: {dialog.message}")
-    popup_detected = True
-    dialog.accept()  # 팝업을 수락'''
-
 
 def load_whiteout_texts(file_path):
     """CSV 파일에서 화이트아웃 텍스트 목록을 로드합니다."""
@@ -209,7 +202,7 @@ def close_modal_if_present(page):
     return False
 
 
-def verify_widget_button_action(page, widget_name, locator, button_name, test_results, action=None, hover_positions=None):
+def verify_widget_button_click(page, widget_name, locator, button_name, test_results, action=None, hover_positions=None):
     """
     버튼 동작 수행 함수.
 
@@ -850,54 +843,6 @@ def verify_agent_action(page, expected_agent, test_results):
 '''
 
 
-def metrics_button_action(page, test_results):
-    try:
-        logging.info("Metrics 버튼 클릭 후 동작 수행")
-
-        # 팝업 표시 확인
-        popup_locator = page.locator("div.popup-class")
-        assert popup_locator.is_visible(), "팝업이 표시되지 않았습니다"
-        logging.info("팝업이 정상적으로 표시됨")
-
-    except AssertionError as e:
-        logging.error(f"검증 실패: {str(e)}")
-        log_result(False, str(e))
-        test_results.append(str(e))
-
-    except Exception as e:
-        logging.error(f"오류 발생: {str(e)}")
-        log_result(False, f"예외 발생: {str(e)}")
-        test_results.append(f"예외 발생: {str(e)}")
-
-
-def server_button_action(page, test_results):
-    try:
-        logging.info("Server 버튼 클릭 후 동작 수행")
-        # 페이지 전환 확인
-        page.wait_for_url("**/server-details")
-        assert page.url.endswith("/server-details"), "Server 상세 페이지로 이동하지 않았습니다"
-
-        # 화이트아웃 검증 추가
-        verify_whiteout(
-            page=page,
-            screen_name="Server 상세 페이지",
-            save_path="path/to/save/screenshots",
-            test_results=test_results
-        )
-
-        logging.info("Server 상세 페이지 검증 완료")
-
-    except AssertionError as e:
-        logging.error(f"검증 실패: {str(e)}")
-        log_result(False, str(e))
-        test_results.append(str(e))
-
-    except Exception as e:
-        logging.error(f"오류 발생: {str(e)}")
-        log_result(False, f"예외 발생: {str(e)}")
-        test_results.append(f"예외 발생: {str(e)}")
-
-
 def close_popups(page):
     """
     발생하는 팝업을 감지하고 닫는 함수.
@@ -1005,7 +950,7 @@ def process_case_3(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1186,7 +1131,7 @@ def process_case_11(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1209,7 +1154,7 @@ def process_case_12(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             widget_name=widget["widget_name"],
             locator=element_locator,
@@ -1328,7 +1273,7 @@ def process_case_17(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1351,7 +1296,7 @@ def process_case_18(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             widget_name=widget["widget_name"],
             locator=element_locator,
@@ -1470,7 +1415,7 @@ def process_case_23(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1493,7 +1438,7 @@ def process_case_24(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             widget_name=widget["widget_name"],
             locator=element_locator,
@@ -1589,7 +1534,7 @@ def process_case_26(page, test_results):
 #     for widget in filtered_widgets:
 #         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-#         verify_widget_button_action(
+#         verify_widget_button_click(
 #             page=page,
 #             widget_name=widget["widget_name"],
 #             locator=element_locator,
@@ -1659,7 +1604,7 @@ def process_case_35(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1683,7 +1628,7 @@ def process_case_36(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1707,7 +1652,7 @@ def process_case_37(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1777,7 +1722,7 @@ def process_case_40(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1801,7 +1746,7 @@ def process_case_41(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],
@@ -1825,7 +1770,7 @@ def process_case_42(page, test_results):
     for widget in filtered_widgets:
         element_locator = widget["element_locator"].format(locator=widget["locator"])
 
-        verify_widget_button_action(
+        verify_widget_button_click(
             page=page,
             locator=element_locator,
             widget_name=widget["widget_name"],

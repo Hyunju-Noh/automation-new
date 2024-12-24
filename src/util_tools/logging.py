@@ -37,6 +37,14 @@ def setup_logging_projectpage():
     setup_logging(log_save_path, custom_log_filename)
 
 
+def setup_logging_resourceboardpage():
+    """Resource Board page 로그 설정."""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_save_path = "src/reports/logs/ResourceBoard_Page"
+    custom_log_filename = f"ProjectPage_{timestamp}.log"
+    setup_logging(log_save_path, custom_log_filename)
+
+
 #테스트 로그 결과값 메시징
 def log_result(success, message):
     if success:
