@@ -97,8 +97,19 @@ class Test_ResourceBoard:
                     locator=element_locator,
                     widget_name=widget["widget_name"],
                     button_name=widget["button_name"],
-                    action=widget["action"]
+                    action=widget["action"] (page=resource_board_page)
                 )
+
+                # 추가 액션 결과 검증
+                success, results = widget["action"](
+                    screen_name="서버 목록 화면",
+                    expected_url="/server/list",
+                    save_path=resource_board_page.save_path,
+                )
+
+                assert success, f"[{widget['widget_name']}] 버튼 클릭 실패: {results}"
+                logging.info(f"[{widget['widget_name']}] 버튼 클릭 및 추가 액션 검증 성공")
+
             except AssertionError as e:
                     failures.append(str(e))  # 실패 내용을 기록하고 계속 진행 
 
@@ -148,11 +159,94 @@ class Test_ResourceBoard:
                     element_locator=element_locator,
                     button_name=widget["button_name"],
                     hover_position=widget.get("hover_position"),  # None 처리 가능
-                    action=widget["action"] # 함수 전달
+                    action=widget["action"] (page=resource_board_page)
                 )
+
+                # 추가 액션 결과 검증
+                success, results = widget["action"](
+                    popover_locator="div.ant-popover.ant-popover-placement-bottom",  # Popover 부모 요소를 나타내는 조건
+                    popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
+                    expected_text="CPU",
+                )
+
+                assert success, f"[{widget['widget_name']}] 호버 동작 실패: {results}"
+                logging.info(f"[{widget['widget_name']}] 호버 동작 및 추가 액션 검증 성공")
 
             except AssertionError as e:
                     failures.append(str(e))  # 실패 내용을 기록하고 계속 진행 
+
+
+    def process_case_28(resource_board_page):
+        # Case 28: [Server Status Map] 위젯 [Status Map chart] 동작 확인
+
+        logging.info("=== [Case 28] 검증 시작 ===")
+
+        filtered_widgets = [
+            widget for widget in resource_board_page.get_widgets()  
+            if widget["widget_name"] == "Server Status Map" and widget["element_name"] == "Status Map chart"
+        ]
+
+        for widget in filtered_widgets:
+            element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+            try:
+                # ResourceBoardPage의 verify_widget_button_click 메서드 호출
+                resource_board_page.verify_widget_button_click(
+                    locator=element_locator,
+                    widget_name=widget["widget_name"],
+                    button_name=widget["button_name"],
+                    action=widget["action"] (page=resource_board_page)
+                )
+
+                # 추가 액션 결과 검증
+                success, results = widget["action"](
+                    screen_name="서버 목록 화면",
+                    expected_url="/server/list",
+                    save_path=resource_board_page.save_path,
+                )
+
+                assert success, f"[{widget['widget_name']}] 버튼 클릭 실패: {results}"
+                logging.info(f"[{widget['widget_name']}] 버튼 클릭 및 추가 액션 검증 성공")
+
+            except AssertionError as e:
+                    failures.append(str(e))  # 실패 내용을 기록하고 계속 진행 
+
+
+    def process_case_34(resource_board_page):
+        # Case 34: [프로세스 CPU TOP5] 위젯 - 정보 버튼 동작 확인
+
+        logging.info("=== [Case 34] 검증 시작 ===")
+
+        filtered_widgets = [
+            widget for widget in resource_board_page.get_widgets()  
+            if widget["widget_name"] == "프로세스 CPU TOP5" and widget["element_name"] == "info button"
+        ]
+
+        for widget in filtered_widgets:
+            element_locator = widget["element_locator"].format(locator=widget["locator"])
+
+            try:
+                # ResourceBoardPage의 verify_widget_hover_action 메서드 호출
+                resource_board_page.verify_widget_hover_action(
+                     widget_name=widget["widget_name"],
+                    element_locator=element_locator,
+                    button_name=widget["button_name"],
+                    hover_position=widget.get("hover_position"),  # None 처리 가능
+                    action=widget["action"] (page=resource_board_page) # 함수 전달
+                )
+
+                # 추가 액션 결과 검증
+                success, results = widget["action"](
+                popover_locator="div.ant-popover.ant-popover-placement-top",  # Popover 부모 요소를 나타내는 조건
+                popover_text_locator="div.HelperButton__ContentContainer-dPhKeC.eokXGu",  # 팝오버 텍스트 클래스
+                expected_text="CPU",
+                )
+
+                assert success, f"[{widget['widget_name']}] 호버 동작 실패: {results}"
+                logging.info(f"[{widget['widget_name']}] 호버 동작 및 추가 액션 검증 성공")
+
+            except AssertionError as e:
+                    failures.append(str(e))  # 실패 내용을 기록하고 계속 진행
 
 
     # 태그 값은 나중에 tc에 고유 번호 생성해서, 생성된 고유번호 넣어도 됨

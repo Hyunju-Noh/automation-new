@@ -21,6 +21,16 @@ class BasePage:
             pass
 
 
+    def open_side_menus(self):
+        """왼쪽 메뉴의 상위 메뉴 클릭."""
+        menu_wrap = self.page.query_selector(self.menu_wrap_selector)
+        parent_elements = menu_wrap.query_selector_all(self.parent_elements_selector)
+
+        for element in parent_elements:
+            element.click()
+            self.wait_for_network_idle()    
+
+
     def wait_for_network_idle(self):
         """네트워크 안정 상태까지 대기."""
         self.page.wait_for_load_state('networkidle')
@@ -113,62 +123,6 @@ class BasePage:
         # 추가 동작 수행
         if action:
             action(self)
-
-
-    def verify_widget_structure(self, parent_locator: str, widget_name: str, element_name: str, child_count: str,) -> Tuple[bool, List[str]]:
-        """
-        위젯의 하위 구조 검증
-        ex) ResourceCards__FlexRemainder의 하위 구조 검증
-
-        :param parent_locator: 부모 요소 locator
-        :param widget_name: 위젯 이름 (로그용)
-        :param element_name: 하위 구조 이름 (로그용)
-        :param child_count: 기대되는 하위 요소 개수
-        :param test_results: 테스트 결과를 기록할 리스트
-        """
-        results = []
-        success = True
-
-        display_name = f"{widget_name} {element_name}" if element_name else widget_name
-        logging.info(f"[{display_name}] 표시 여부 확인 중")
-
-        self.close_popups()
-
-        # 부모 요소 가져오기
-        parent_element = self.page.locator(parent_locator)
-        if not parent_element.is_visible():
-            success = False
-            results.append(f"[{widget_name}] 위젯의 부모 요소가 보이지 않습니다")
-        
-        # SubTitle과 SubValue 검증
-        subtitle_elements = parent_element.locator("div.ResourceCards__SubTitle-eZXil")
-        value_elements = parent_element.locator("div.ResourceCards__SubValue-bOvbm")
-
-        subtitle_count = subtitle_elements.count()
-        value_count = value_elements.count()
-
-        logging.info(f"[{widget_name}] SubTitle 개수: {subtitle_count}, SubValue 개수: {value_count}")
-
-        if subtitle_count <= 0:
-            success = False
-            results.append(f"[{widget_name}] SubTitle 요소를 찾지 못했습니다")
-
-        if value_count <= 0:
-            success = False
-            results.append(f"[{widget_name}] SubValue 요소를 찾지 못했습니다")
-
-        # SubTitle과 SubValue의 개수 및 표시 여부 검증
-        for i in range(min(subtitle_count, value_count)):
-            if not subtitle_elements.nth(i).is_visible():
-                success = False
-                results.append(f"[{widget_name}] {i+1}번째 SubTitle 요소가 표시되지 않습니다")
-            if not value_elements.nth(i).is_visible():
-                success = False
-                results.append(f"[{widget_name}] {i+1}번째 SubValue 요소가 표시되지 않습니다")
-            if success:
-                logging.info(f"[{widget_name}] {i+1}번째 SubTitle 및 SubValue 확인 완료")
-
-        return success, results
         
 
     def verify_whiteout(self, screen_name: str, save_path: str) -> Tuple[bool, str]:
@@ -222,15 +176,221 @@ class BasePage:
             action(self)
 
 
-    def verify_navigation_action(self, screen_name: str, expected_url: str):
+    def verify_navigation_action(self, screen_name: str, expected_url: str, save_path: str) -> Tuple[bool, List[str]]:
         """
-        버튼 클릭 후 페이지 이동 및 UI 상태 검증
+        버튼 클릭 후 새로운 탭의 페이지 이동 및 UI 상태 검증
 
-        :param page: Playwright 페이지 객체
-        :param test_results: 테스트 결과 리스트
         :param screen_name: 검증 대상 화면 이름 (위젯 리스트에서 전달)
         :param expected_url: 기대되는 URL (위젯 리스트에서 전달)
+        :param save_path: 스크린샷 저장 경로
+        :return: (성공 여부, 에러 메시지 리스트)
         """
-#verify_navigation_action 함수부터 차례로 작성하고, 그 다음에는 verify_navigation_action 함수 사용하는 테스트 함수를 테스트 스크립트에 예제 하나 추가하기
+        logging.info("버튼 클릭 후 확인 진행 중")
+
+        success = True
+        results = []
+        new_page = None
+
+        try:
+
+            # 새 페이지 열림 감지
+            try:
+                with self.page.context.expect_page(timeout=5000) as new_page_info:
+                    logging.info("새 페이지 감지 대기 중...")
+                new_page = new_page_info.value
+            except TimeoutError:
+                logging.warning("페이지 새로고침 시도...")
+                self.page.reload()
+                self.page.wait_for_load_state('networkidle')
+                logging.info("페이지 새로고침 완료")
+
+                # 새로고침 후 새 페이지 감지 재시도
+                with self.page.context.expect_page(timeout=5000) as new_page_info:
+                    logging.info("새 페이지 감지 재시도 중...")
+                new_page = new_page_info.value
+
+            # 새 페이지 정보 가져오기
+            new_page.wait_for_timeout(1000)  # 1초 대기
+            new_page.wait_for_load_state('networkidle')  # 새 페이지 로딩 완료 대기
+            logging.info("새 페이지 로딩 완료")
+
+            # 팝업 닫기
+            self.close_popups()
+
+            # 1. 새 페이지 URL 검증
+            current_url = new_page.url
+            logging.info(f"새 페이지 URL: {current_url}")
+            if expected_url not in current_url:
+                success = False
+                results.append(f"{screen_name} 페이지로 이동하지 않았습니다. 현재 URL: {current_url}")
+            else:
+                logging.info(f"{screen_name} 페이지 정상 이동 확인됨")
+
+            # 2. 새 페이지에서 UI 화이트아웃 검증
+            whiteout_detected, _ = self.verify_whiteout(
+                screen_name=screen_name,
+                save_path=save_path,
+            )
+            if whiteout_detected:
+                success = False
+                results.append(f"{screen_name} 페이지에서 화이트아웃이 감지되었습니다.")
+            else:
+                logging.info(f"{screen_name} UI 화이트아웃 없음 확인됨")
+
+        except Exception as e:
+            success = False
+            results.append(f"예외 발생: {str(e)}")
+
+        finally:
+        # 새 페이지 닫기
+            if new_page and not new_page.is_closed():
+                logging.info("새 페이지 닫는 중...")
+                new_page.close()
+
+        return success, results
+    
+
+    def verify_navigation_goback_action(self, screen_name: str, expected_url: str, save_path: str) -> Tuple[bool, List[str]]:
+        """
+        버튼 클릭 후 페이지 이동 및 UI 상태 검증 + 이전 화면으로 이동
+
+        :param screen_name: 검증 대상 화면 이름 (위젯 리스트에서 전달)
+        :param expected_url: 기대되는 URL (위젯 리스트에서 전달)
+        :return: (성공 여부, 에러 메시지 리스트)
+        """
+        success = True
+        results = []
+
+        try:
+            logging.info("버튼 클릭 후 확인 진행 중")
+
+            self.wait_for_network_idle()
+
+            self.close_popups()
+
+            # 1. 새 페이지 URL에 '/server/list' 포함 여부 확인
+            current_url = self.page.url
+            logging.info(f"새 페이지 URL: {current_url}")
+            if expected_url not in current_url:
+                success = False
+                results.append(f"{screen_name} 페이지로 이동하지 않았습니다. 현재 URL: {current_url}")
+            else:
+                logging.info(f"{screen_name} 페이지 정상 이동 확인됨")
+
+            # 2. 새 페이지에서 UI 화이트아웃 검증
+            whiteout_detected, _ = self.verify_whiteout(
+                screen_name=screen_name,
+                save_path=save_path,
+            )
+            if whiteout_detected:
+                success = False
+                results.append(f"{screen_name} 페이지에서 화이트아웃이 감지되었습니다.")
+            else:
+                logging.info(f"{screen_name} UI 화이트아웃 없음 확인됨")
+
+        except Exception as e:
+            success = False
+            results.append(f"예외 발생: {str(e)}")
+
+        finally:
+            self.page.go_back()
+
+        return success, results
+    
+
+    def info_button_action(self, popover_locator: str, popover_text_locator: str, expected_text: str) -> Tuple[bool, List[str]]:
+        """
+        Popover 요소를 먼저 찾고, 그 하위에서 특정 텍스트를 포함하는 요소를 필터링한 후 상태를 검증하는 함수.
+
+        :param popover_locator: 팝오버 부모 요소의 선택자 
+        :param popover_text_locator: 팝오버 텍스트를 포함하는 요소의 선택자
+        :param expected_text: 팝오버에 포함되어야 하는 예상 텍스트
+        """
+        logging.info("팝오버 상태 및 예상 텍스트 검증 시작")
+
+        success = True
+        results = []
+
+        try:
+            self.page.wait_for_timeout(1000)  # 1초 대기
+
+            self.close_popups()
+
+            # 1. Popover 요소를 먼저 찾기
+            popover_elements = self.page.locator(popover_locator)
+            if not popover_elements.is_visible():
+                success = False
+                results.append("팝오버 요소가 표시되지 않았습니다.")
+                return success, results
+
+            logging.info(f"팝오버 요소 {popover_elements.count()}개 발견")
+
+            matched_popover = None
+
+            # 2. 각 Popover 요소의 하위에서 예상 텍스트 확인
+            for i in range(popover_elements.count()):
+                current_popover = popover_elements.nth(i)
+                text_elements = current_popover.locator(popover_text_locator)
+
+                for j in range(text_elements.count()):
+                    current_text = text_elements.nth(j).text_content().strip()
+                    if expected_text in current_text:
+                        matched_popover = current_popover
+                        break  # 텍스트가 일치하는 Popover 발견
+                if matched_popover:
+                    break
+
+            if not matched_popover:
+                success = False
+                results.append(f"예상 텍스트 '{expected_text}'를 포함하는 팝오버를 찾지 못했습니다.")
+                return success, results
+
+            logging.info(f"예상 텍스트 '{expected_text}'를 포함하는 Popover 요소 발견")
+
+            # 3. 해당 Popover의 상태 확인 (ant-popover-hidden 클래스가 없는지 확인)
+            class_attr = matched_popover.get_attribute("class")
+            if "ant-popover-hidden" in class_attr:
+                success = False
+                results.append("Popover가 열리지 않았습니다: hidden 상태")
+                return success, results
+
+            logging.info("팝오버 상태 검증 성공: hidden 클래스 없음")
+
+        except Exception as e:
+            success = False
+            results.append(f"예외 발생: {str(e)}")
+
+        return success, results
+    
+
+#드롭다운 함수 basepage에 추가하고 관련 테스트 함수 테스트 스크립트에 추가하기
+    def dropdown_button_action(self, dropdown_locator: str, expected_left_value: str, dropdown_list_button_locator: str =None, element_locator: str =None, expected_text: str =None)
+        """
+        Dropdown 요소를 먼저 찾고, 특정 style 조건을 만족하는 요소를 필터링한 후 상태를 검증하는 함수.
+
+        :param dropdown_locator: Dropdown 부모 요소의 선택자
+        :param expected_left_value: style 속성에서 'left'의 예상 값
+        :param test_results: 테스트 결과를 기록할 리스트
+        :param dropdown_list_button_locator: Dropdown 내부 버튼 선택자 (선택적)
+        :param element_locator: 동적으로 생성될 요소의 선택자 템플릿 (선택적)
+        :param expected_text: 동적으로 생성될 요소에 사용될 텍스트 (선택적)
+        """
+        success = True
+        results = []
+
+        try:
+            logging.info("Dropdown 상태 및 예상 조건 검증 시작")
+
+            self.page.wait_for_timeout(1000)  # 1초 대기
+
+            self.close_popups()
+
+
+
+
+
+                                        
+
+
 
 
