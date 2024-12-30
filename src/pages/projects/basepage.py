@@ -1,6 +1,7 @@
 from playwright.sync_api import Page
 from typing import List, Tuple
 import logging
+import re
 import util_tools.check_whiteout as whiteout
 
 class BasePage:
@@ -8,6 +9,8 @@ class BasePage:
         self.page = page
         self.whiteout_texts = whiteout_texts
         self.resource_board_link = 'a[href="/v2/project/sms/29763/dashboard/resource_board"]'
+        self.menu_wrap_selector = 'div.Menustyles__MenuWrap-hRfo.hmTPnA'
+        self.parent_elements_selector = 'div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT'
 
     def close_popups(self):
         """발생하는 팝업을 감지하고 닫음."""
@@ -36,13 +39,66 @@ class BasePage:
         self.page.wait_for_load_state('networkidle')
 
 
+    def get_menu_wrap(self):
+        """menu_wrap 요소 가져오기"""
+        menu_wrap = self.page.query_selector(self.menu_wrap_selector)
+        if not menu_wrap:
+            raise Exception("menu_wrap 요소를 찾을 수 없습니다.")
+        return menu_wrap
+
+
+    def get_parent_elements(self):
+        """menu_wrap 내의 모든 상위 메뉴 요소를 가져오는 메서드"""
+        menu_wrap = self.get_menu_wrap()  # 이미 menu_wrap 존재 여부는 get_menu_wrap에서 확인함
+        parent_elements = menu_wrap.query_selector_all(self.parent_elements_selector)
+        
+        if not parent_elements:
+            raise Exception("상위 메뉴 요소를 찾을 수 없습니다.")
+        return parent_elements
+
+
+    def open_sub_menus(self):
+        """상위 메뉴 클릭하여 하위 메뉴 열기"""
+        parent_elements = self.get_parent_elements()
+        logging.info("상위 메뉴 클릭하여 하위 메뉴 오픈 중") 
+
+        for element in parent_elements:
+            element.click()  # 요소 클릭
+            self.page.wait_for_load_state('networkidle', timeout=20000)  # 페이지 로드 대기
+
+        logging.info("하위 메뉴 오픈 후 페이지 로드 완료")
+
+
+    def url(self, project_type, project_id):
+        """프로젝트 페이지 URL 반환"""
+        return f"https://service.whatap.io/v2/project/{project_type}/{project_id}"
+    
+
+    def navigate_to_project(self, project_type: str, project_id: str):
+        """
+        특정 프로젝트 페이지로 이동.
+
+        :param project_type: 프로젝트 타입 (예: "sms")
+        :param project_id: 프로젝트 ID (예: "12345")
+        """
+        # URL 생성
+        project_url = self.url(project_type, project_id)
+
+        logging.info(f"프로젝트로 이동: {project_url}")
+
+        # 페이지 이동
+        self.page.goto(project_url)
+        self.wait_for_network_idle()
+
+
+
     def navigate_to_menu(self, menu_link: str):
         """메뉴 화면으로 이동.
 
         :param menu_link: 이동할 메뉴의 링크 (CSS 선택자 또는 XPath)
         """
-
         logging.info(f"메뉴 이동: {menu_link}")
+
         self.page.locator(menu_link).click()
         self.wait_for_network_idle()
         self.page.wait_for_timeout(2000)  # 2초 대기
@@ -364,7 +420,7 @@ class BasePage:
     
 
 #드롭다운 함수 basepage에 추가하고 관련 테스트 함수 테스트 스크립트에 추가하기
-    def dropdown_button_action(self, dropdown_locator: str, expected_left_value: str, dropdown_list_button_locator: str =None, element_locator: str =None, expected_text: str =None)
+    def dropdown_button_action(self, dropdown_locator: str, expected_left_value: str, dropdown_list_button_locator: str =None, element_locator: str =None, expected_text: str =None) -> Tuple[bool, List[str]]:
         """
         Dropdown 요소를 먼저 찾고, 특정 style 조건을 만족하는 요소를 필터링한 후 상태를 검증하는 함수.
 
@@ -378,12 +434,126 @@ class BasePage:
         success = True
         results = []
 
+        logging.info("Dropdown 상태 및 예상 조건 검증 시작")
+
+        self.page.wait_for_timeout(1000)  # 1초 대기
+
+        self.close_popups()
+
         try:
-            logging.info("Dropdown 상태 및 예상 조건 검증 시작")
+            # 1. Dropdown 요소 찾기
+            dropdown_elements = self.page.locator(dropdown_locator)
+            if not dropdown_elements.is_visible():
+                success = False
+                results.append("Dropdown 요소가 표시되지 않았습니다.")
 
-            self.page.wait_for_timeout(1000)  # 1초 대기
+            logging.info(f"Dropdown 요소 {dropdown_elements.count()}개 발견")
+            matched_dropdown = None
 
-            self.close_popups()
+            # 2. 각 Dropdown 요소에서 style 조건 확인
+            for i in range(dropdown_elements.count()):
+                current_dropdown = dropdown_elements.nth(i)
+                style_attr = current_dropdown.get_attribute("style")
+
+                if style_attr and f"left: {expected_left_value}px" in style_attr:
+                    matched_dropdown = current_dropdown
+                    break  # 조건을 만족하는 Dropdown 발견
+
+            if not matched_dropdown:
+                success = False
+                results.append(f"left 값이 '{expected_left_value}px'인 Dropdown을 찾지 못했습니다.")
+
+            logging.info(f"left 값이 '{expected_left_value}px'인 Dropdown 요소 발견")
+
+            # 3. 해당 Dropdown의 상태 확인
+            class_attr = matched_dropdown.get_attribute("class")
+            if "ant-dropdown-hidden" in class_attr:
+                success = False
+                results.append("Dropdown이 열리지 않았습니다: hidden 상태")
+
+            logging.info("Dropdown 상태 검증 성공: hidden 클래스 없음")
+
+            # 4. Dropdown 내부 버튼 클릭 및 결과 확인
+            if dropdown_list_button_locator:
+                logging.info("Dropdown 내부 버튼 클릭 시도 중")
+                dropdown_elements = self.page.locator(dropdown_list_button_locator)
+                dropdown_elements.click()
+                logging.info("Dropdown 내부 버튼 클릭 성공")
+
+                dynamic_locator = element_locator.replace("expected_text", expected_text)
+                popover_elements = self.page.locator(dynamic_locator)
+                if not popover_elements.is_visible():
+                    success = False
+                    results.append(f"요소 '{expected_text}'가 클릭 후 표시되지 않았습니다.")
+
+                logging.info(f"요소 '{expected_text}'가 클릭 후 정상적으로 표시됨")
+
+            results.append("Dropdown 검증 및 동작 성공")
+        
+        except Exception as e:
+            success = False
+            results.append(f"예외 발생: {str(e)}")
+
+        return success, results
+    
+
+    def column_button_action(self, tooltip_locator: str) -> Tuple[bool, List[str]]:
+        """
+        Dropdown 요소를 먼저 찾고, 특정 style 조건을 만족하는 요소를 필터링한 후 상태를 검증하는 함수.
+
+        :param tooltip_locator: tooltip 요소의 선택자
+        """
+        success = True
+        results = []
+
+        logging.info("Dropdown 상태 및 예상 조건 검증 시작")
+
+        self.page.wait_for_timeout(1000)  # 1초 대기
+
+        self.close_popups()
+
+        try:
+            # 1. tooltip 요소를 먼저 찾기
+            tooltip_elements = self.page.locator(tooltip_locator)
+            if not tooltip_elements.count() > 0:
+                success = False
+                results.append("팝오버 요소를 찾지 못했습니다.")
+
+            logging.info(f"팝오버 요소 {tooltip_elements.count()}개 발견")
+
+            matched_tooltip = None
+
+            # 2. 각 tooltip 요소에서 style 조건 확인
+            matched_tooltip = next(
+                (
+                    tooltip_elements.nth(i)
+                    for i in range(tooltip_elements.count())
+                    if (style_attr := tooltip_elements.nth(i).get_attribute("style"))
+                    and int(re.search(r'left:\s*(-?\d+)px', style_attr).group(1)) > 0
+                    and int(re.search(r'top:\s*(-?\d+)px', style_attr).group(1)) > 0
+                ),
+                None,
+            )
+            if not matched_tooltip:
+                success = False
+                results.append("left 및 top 값이 양수인 Tooltip을 찾지 못했습니다.")
+
+            logging.info(f"left 및 top 값이 양수인 Tooltip 요소 발견")
+
+            # 3. 해당 tooltip 상태 확인 (ant-tooltip-hidden 클래스가 없는지 확인)
+            class_attr = matched_tooltip.get_attribute("class")
+            if "ant-tooltip-hidden" in class_attr:
+                success = False
+                results.append("tooltip이 열리지 않았습니다: hidden 상태")
+
+            logging.info("툴팁 상태 검증 성공: hidden 클래스 없음")
+
+        except Exception as e:
+            success = False
+            results.append(f"예외 발생: {str(e)}")
+
+        return success, results
+
 
 
 

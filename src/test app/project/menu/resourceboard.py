@@ -750,12 +750,7 @@ def column_button_action(page, tooltip_locator, test_results):
     Dropdown 요소를 먼저 찾고, 특정 style 조건을 만족하는 요소를 필터링한 후 상태를 검증하는 함수.
 
     :param page: Playwright 페이지 객체
-    :param dropdown_locator: Dropdown 부모 요소의 선택자
-    :param expected_left_value: style 속성에서 'left'의 예상 값
-    :param test_results: 테스트 결과를 기록할 리스트
-    :param dropdown_list_button_locator: Dropdown 내부 버튼 선택자 (선택적)
-    :param element_locator: 동적으로 생성될 요소의 선택자 템플릿 (선택적)
-    :param expected_text: 동적으로 생성될 요소에 사용될 텍스트 (선택적)
+    :param tooltip_locator: tooltip 요소의 선택자
     """
     try:
         logging.info("Dropdown 상태 및 예상 조건 검증 시작")
@@ -1733,9 +1728,9 @@ def process_case_40(page, test_results):
 
 
 def process_case_41(page, test_results):
-    # Case 36: [프로세스 메모리 TOP5] 위젯 프로세스 테이블 - [Name] 동작 확인
+    # Case 41: [프로세스 메모리 TOP5] 위젯 프로세스 테이블 - [Name] 동작 확인
 
-    logging.info("=== [Case 36] 검증 시작 ===")
+    logging.info("=== [Case 41] 검증 시작 ===")
 
     filtered_widgets = [
         widget for widget in all_widgets 
@@ -1757,9 +1752,9 @@ def process_case_41(page, test_results):
 
 
 def process_case_42(page, test_results):
-    # Case 37: [프로세스 메모리 TOP5] 위젯 프로세스 테이블 - [Servers] 동작 확인
+    # Case 42: [프로세스 메모리 TOP5] 위젯 프로세스 테이블 - [Servers] 동작 확인
 
-    logging.info("=== [Case 37] 검증 시작 ===")
+    logging.info("=== [Case 42] 검증 시작 ===")
 
     filtered_widgets = [
         widget for widget in all_widgets 

@@ -1,10 +1,11 @@
 from pages.projects.basepage import BasePage
 from pages.projects.server_project.dashboard.resourceboard_widgets import all_widgets
+from typing import List, Tuple
 import logging
 
 class ResourceBoardPage(BasePage):
-    def __init__(self, page):
-        super().__init__(page)
+    def __init__(self, page, whiteout_texts):
+        super().__init__(page, whiteout_texts)
         self.widget_locator = "div.ResourceCards__CardDom-dzFtxX"  # 위젯 공통 선택자
         self.menu_wrap_selector = "div.Menustyles__MenuWrap-hRfo.hmTPnA"
         self.parent_elements_selector = "div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT"
