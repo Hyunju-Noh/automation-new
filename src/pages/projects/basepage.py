@@ -5,12 +5,14 @@ import re
 import util_tools.check_whiteout as whiteout
 
 class BasePage:
-    def __init__(self, page: Page, whiteout_texts: list):
+    def __init__(self, page: Page, whiteout_texts: list, save_path):
         self.page = page
         self.whiteout_texts = whiteout_texts
         self.resource_board_link = 'a[href="/v2/project/sms/29763/dashboard/resource_board"]'
         self.menu_wrap_selector = 'div.Menustyles__MenuWrap-hRfo.hmTPnA'
         self.parent_elements_selector = 'div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT'
+        self.save_path = save_path
+        
 
     def close_popups(self):
         """발생하는 팝업을 감지하고 닫음."""
@@ -22,6 +24,17 @@ class BasePage:
                 close_button_locator.click()
         except Exception as e:
             pass
+
+
+    def close_browser(self):
+        """브라우저 창을 안전하게 닫는 메서드."""
+        try:
+            if self.page.context.browser and self.page.context.browser.is_connected():
+                logging.info("브라우저 창 닫는 중...")
+                self.page.context.browser.close()
+        except Exception as e:
+            logging.error(f"브라우저 창 닫기 중 오류 발생: {str(e)}")
+
 
 
     def open_side_menus(self):
@@ -178,7 +191,8 @@ class BasePage:
 
         # 추가 동작 수행
         if action:
-            action(self)
+            success, results = action()
+            return success, results
         
 
     def verify_whiteout(self, screen_name: str, save_path: str) -> Tuple[bool, str]:
@@ -229,7 +243,8 @@ class BasePage:
 
         # 추가 동작 수행
         if action:
-            action(self)
+            success, results = action()
+            return success, results
 
 
     def verify_navigation_action(self, screen_name: str, expected_url: str, save_path: str) -> Tuple[bool, List[str]]:

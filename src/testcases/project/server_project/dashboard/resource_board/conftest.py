@@ -1,3 +1,5 @@
+# src/testcases/project/server_project/dashboard/resource_board/conftest.py
+
 import pytest
 import util_tools.logging as log_utils
 from pages.projects.conftest import base_page
@@ -9,6 +11,7 @@ def setup_logging_once():
     log_utils.setup_logging_resourceboardpage()
 
 @pytest.fixture
-def resource_board_page(base_page):
+def resource_board_page(base_page, request):
     """ResourceBoardPage 객체 생성"""
-    return ResourceBoardPage(base_page.page, base_page.whiteout_texts)
+    save_path = getattr(request.cls, "save_path", None)
+    return ResourceBoardPage(base_page.page, base_page.whiteout_texts, save_path=save_path)

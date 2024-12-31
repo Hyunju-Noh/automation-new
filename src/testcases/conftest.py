@@ -34,3 +34,4 @@ def setup_playwright_context(request, playwright, login_session_fixture):
 
     yield
     context.close()
+    browser.close()

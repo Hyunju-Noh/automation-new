@@ -4,12 +4,13 @@ from typing import List, Tuple
 import logging
 
 class ResourceBoardPage(BasePage):
-    def __init__(self, page, whiteout_texts):
-        super().__init__(page, whiteout_texts)
+    def __init__(self, page, whiteout_texts, save_path):
+        super().__init__(page, whiteout_texts, save_path)
         self.widget_locator = "div.ResourceCards__CardDom-dzFtxX"  # 위젯 공통 선택자
         self.menu_wrap_selector = "div.Menustyles__MenuWrap-hRfo.hmTPnA"
         self.parent_elements_selector = "div.Menustyles__MenuItemWrapCommon-cHqrwY.Menustyles__Parent-XgDRT"
         self.widgets = all_widgets
+        self.save_path = save_path
 
     def get_widgets(self):
         """위젯 리스트 반환"""
